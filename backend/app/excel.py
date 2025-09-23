@@ -67,12 +67,28 @@ class CostingWorkbookWriter:
 
     def _write_xlsx(self, export: Dict[str, float], path: Path) -> Path:
         wb = Workbook()
-        ws_summary = wb.active
-        ws_summary.title = "Summary"
-        ws_sell = wb.create_sheet("Sell Price List")
+        summary_sheet = wb.active
+        summary_sheet.title = "Summary"
+
+        sheets = {summary_sheet.title: summary_sheet}
+
+        for sheet_name in {"Sell Price List"}:
+            sheets[sheet_name] = wb.create_sheet(sheet_name)
+
+        for sheet_name, cell_map in SUMMARY_CELL_MAP.items():
+            ws = sheets.get(sheet_name)
+            if ws is None:
+                ws = wb.create_sheet(sheet_name)
+                sheets[sheet_name] = ws
+            for cell, value in cell_map.items():
+                ws[cell] = value
+
         for address, value in export.items():
             sheet_name, cell = address.split("!")
-            ws = wb[sheet_name]
+            ws = sheets.get(sheet_name)
+            if ws is None:
+                ws = wb.create_sheet(sheet_name)
+                sheets[sheet_name] = ws
             ws[cell] = value
         wb.save(path)
         logger.info("Saved costing workbook to %s", path)
