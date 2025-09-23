@@ -1,97 +1,97 @@
-# RDS Local Sales Tool Architecture
+# ARCHITECTURE — App vs Excel Behavior Mapping (Ground Truth First)
 
-## Overview
+**Scope:** Replace the two-workbook system (RDS Sales Tool `.xlsm` + Costing `.xlsb`) with an app+DB while **exactly** replicating Excel UI, formulas, macros, outputs, and filenames.
 
-The solution replaces the legacy dual-workbook workflow with a local-first web application. It consists of a Flask backend, a SQLite database managed through SQLAlchemy, and a static HTMX/Tailwind frontend served by Flask. All generated outputs and templates live on the local filesystem so that the application can run completely offline on Windows.
+**Ground Truth Inputs**
+- **Workbook A (primary):** `RDS Sales Tool -hrc.xlsm`  
+- **Workbook B (linked):** `Costing - hrc.xlsb` (binary; treat as canonical addresses from VBA)  
+- **VBA/Macros:** Provided (Generate, SaveCosting, SaveWord, Log, MarginChange, ResetMargin, Test utilities)  
+- **Word Template (optional):** `Quote.docx` with bookmarks (listed below)
 
-## Directory Layout
+---
 
-```
-backend/
-  app/
-    __init__.py        # Flask application factory
-    api.py             # REST endpoints
-    cel.py             # Costing Emulation Layer (CEL)
-    config.py          # Configuration loader
-    database.py        # SQLAlchemy engine/session helpers
-    excel.py           # Costing workbook exporter
-    formula.py         # Minimal Excel formula interpreter
-    ingestion.py       # Workbook A ingestion utilities
-    models.py          # ORM models
-    services.py        # Quote orchestration service
-frontend/
-  index.html           # HTMX/Tailwind single-page shell
-  static/
-    js/app.js          # UI interaction logic
-    css/tailwind.css   # Tailwind CDN reference
-scripts/
-  ingest_rds.py        # CLI ingestion helper
-.tests/
-  test_cel.py          # Unit tests for CEL rollups
-  test_outputs.py      # Golden output checks
-```
+## 1) Excel Ground Truth (from your VBA)
 
-## Backend Components
+### 1.1 Canonical Write → Costing.Summary (from RDS Sales Tool)
+- **Spare Parts:**  
+  - `Summary!H38 ← RDS Sheet1!B4`  
+  - `Summary!H39 ← RDS Sheet1!B5`  
+  - `Summary!H40 ← RDS Sheet1!B6`
+- **Guarding:**  
+  - `Summary!H32 ← RDS Sheet3!C6`  
+  - `Summary!H33 ← RDS Sheet3!C7`
+- **Infeed Conveyor:**  
+  - `Summary!H18 ← RDS Sheet3!C8`  
+  - `Summary!H19 ← RDS Sheet3!C9`  
+  - `Summary!H20 ← RDS Sheet3!C10`
+- **Misc:**  
+  - `Summary!H45 ← RDS Sheet3!C11`  
+  - `Summary!H46 ← RDS Sheet3!C12`  
+  - `Summary!H47 ← RDS Sheet3!C13`
+- **Margin:**  
+  - `Summary!M4 ← RDS Sheet1!B12`
 
-* **Configuration:** `config.py` reads `config.json` or environment overrides, ensuring that template/output directories exist.
-* **Database:** `database.py` provisions the SQLite database (`data/rds.db`) and exposes a `session_scope()` context manager for transactional operations.
-* **Models:** The schema captures user inputs, pricing snapshots, the costing summary, individual costing items (mapped to `Summary!J*` cells), and a usage log that mirrors the historical Excel log behaviour.
-* **Costing Emulation Layer:** `cel.py` builds a context for all `Summary!J*` cells, evaluates rollups, and enforces toggle semantics (H18/H19/...). It exposes helpers for Margin Change / Reset Margin operations and for exporting grid data to the UI.
-* **Services:** `services.py` orchestrates quotes—loading/saving input data, recomputing totals, and logging usage. It also exposes `export_summary_for_workbook()` used by the Excel exporter.
-* **Formula Engine:** `formula.py` provides a minimal interpreter capable of `SUM` and arithmetic operators, sufficient for the known `J*` rollups.
-* **Outputs:** `excel.py` and `word.py` produce the Costing workbook and Proposal documents. The Excel writer prefers `.xlsb` via COM (when available) and falls back to `.xlsx` everywhere else. The Word writer replaces bookmarks and optionally produces a PDF using `docx2pdf` when installed.
-* **Ingestion:** `ingestion.py`/`scripts/ingest_rds.py` parse Workbook A and cache the structure under `./.cache/spec/rds_spec.json` for traceability.
+### 1.2 Read Back ← Costing.Summary → RDS Sales Tool
+- **Base costing:**  
+  - `RDS Sheet3!B2 ← SUM(Summary!J4:J10) + Summary!J14 + J17 + J24 + J31`
+- **Spare parts costing:**  
+  - `RDS Sheet3!B3 ← Summary!J38`  
+  - `RDS Sheet3!B4 ← Summary!J39`  
+  - `RDS Sheet3!B5 ← Summary!J40`
+- **Guarding costing:**  
+  - `RDS Sheet3!B6 ← Summary!J32`  
+  - `RDS Sheet3!B7 ← Summary!J33`
+- **Infeed conveyor costing:**  
+  - `RDS Sheet3!B8 ← Summary!J18`  
+  - `RDS Sheet3!B9 ← Summary!J19`  
+  - `RDS Sheet3!B10 ← Summary!J20`
+- **Misc costing:**  
+  - `RDS Sheet3!B11 ← Summary!J45`  
+  - `RDS Sheet3!B12 ← Summary!J46`  
+  - `RDS Sheet3!B13 ← Summary!J47`
+- **Margin echo:**  
+  - `RDS Sheet1!B12 ← Summary!M4`
 
-## Frontend
+### 1.3 Macro Toggles
+When `MarginChange` or `ResetMargin` runs:
+- Force **`Summary!H18,H19,H20,H32,H33,H38,H39,H40,H45,H46,H47 = 1`**, then set `Summary!M4` to the margin.
 
-The frontend uses a lightweight HTMX-like interaction model implemented in plain JavaScript. Two tabs mirror the original Excel experience:
+### 1.4 Word Bookmarks (and sources)
+- **Qty:** `RDS Sheet3!C3:C13`
+- **Price text:** `RDS Sheet3!B2:B13` (B2 = BasePrice; B3…B13 option prices)
+- **Bookmarks:**  
+  `QuoteNum, Customer, Layout, BasePrice, SpareQty, SparePrice, BladeQty, BladePrice, FoamQty, FoamPrice, TallQty, TallPrice, NetQty, NetPrice, FrontUSLQty, FrontUSLPrice, SideUSLQty, SideUSLPrice, SideBadgerQty, SideBadgerPrice, CanadaQty, CanadaPrice, StepQty, StepPrice, TrainQty, TrainPrice, Date, User`
 
-1. **Inputs & Pricing:** Allows editing of the quote metadata and raw configuration JSON, triggers recomputation, and shows live pricing totals.
-2. **Costing Grid:** Displays the emulated `Summary!J*` values, toggle states, and derived margin/sell price. Toggles are interactive and dispatch updates back to the backend.
+### 1.5 Output Filenames (must match exactly)
+- **Costing Excel:** `01 - Q#<Quote> - Costing.xlsb`
+- **Word Doc:** `Alliance Automation Proposal #<Quote> - Dismantling System.docx`
+- **PDF:** `Alliance Automation Proposal #<Quote> - Dismantling System.pdf`
 
-Buttons for **Margin Change**, **Reset Margin**, and **Generate Outputs** interact with dedicated backend routes (the generate endpoint is stubbed in the UI and ready to be wired into the backend service).
+---
 
-## Data Flow
+## 2) App Architecture Expectations
 
-1. User edits inputs or toggles → frontend POSTs to `/api`.
-2. Backend service updates `rds_inputs`, recomputes the costing summary via the CEL, updates `pricing`, and persists toggles/margin.
-3. Response returns updated totals/toggles/pricing for real-time UI refresh.
-4. When generation is invoked, the backend will produce:
-   * Costing workbook (`01 - Q#<Quote> - Costing.xlsx` fallback) via `CostingWorkbookWriter`.
-   * Word proposal and optional PDF via `ProposalWriter`.
-   * Usage log entry in `usage_log`.
+### 2.1 Backend
+- Expose endpoints:
+  - `POST /api/quote/compute` → computes rollups identical to Excel macro flows (respect toggles and margin) and returns JSON with base cost, option costs, margin, and all visible numbers that appear in the RDS UI and Sell Price List/Summary.
+  - `POST /api/quote/generate` → performs **SaveCosting** and **SaveWord** equivalents:
+    - Writes the H/M mappings into an **on-disk** `Costing.xlsb` clone (using COM recommended).
+    - Saves as `01 - Q#<Quote> - Costing.xlsb`.
+    - Opens the Word template, fills bookmarks, saves `.docx`, then exports `.pdf`.
+- Provide a config to replace SharePoint URLs with **local paths** (templates dir, output dir).
 
-## Cell Map
+### 2.2 Database
+- Persist a *Quote* record with:
+  - `quote_number`, `customer`, *all RDS inputs* (mirror Sheet1 and Sheet3), computed pricing slices (base, spares, guarding, infeed, misc), `margin`, and *output file paths*.
 
-| Workbook Cell | Database Field / Key       | Source | Notes |
-| ------------- | -------------------------- | ------ | ----- |
-| `Summary!H18` | `costing_summary.toggles`   | UI     | Infeed conveyor toggle 1 |
-| `Summary!H19` | `costing_summary.toggles`   | UI     | Infeed conveyor toggle 2 |
-| `Summary!H20` | `costing_summary.toggles`   | UI     | Infeed conveyor toggle 3 |
-| `Summary!H32` | `costing_summary.toggles`   | UI     | Guarding standard |
-| `Summary!H33` | `costing_summary.toggles`   | UI     | Guarding custom |
-| `Summary!H38` | `costing_summary.toggles`   | UI     | Spare blades |
-| `Summary!H39` | `costing_summary.toggles`   | UI     | Spare foam |
-| `Summary!H40` | `costing_summary.toggles`   | UI     | Spare misc |
-| `Summary!H45` | `costing_summary.toggles`   | UI     | Misc install |
-| `Summary!H46` | `costing_summary.toggles`   | UI     | Misc training |
-| `Summary!H47` | `costing_summary.toggles`   | UI     | Misc freight |
-| `Summary!M4`  | `costing_summary.margin`    | UI/API | Margin Change/Reset |
-| `Summary!J*`  | `costing_items.metadata_json.summary_cell` | CEL | Stored per costing item |
-| `Sheet3!B2`   | `pricing.subtotal`          | CEL    | `SUM(J4:J10,J14,J17,J24,J31)` |
-| `Sheet3!B3:B5`| `totals[J38:J40]`           | CEL    | Spare parts costing |
-| `Sheet3!B6:B7`| `totals[J32:J33]`           | CEL    | Guarding costing |
-| `Sheet3!B8:B10`| `totals[J18:J20]`          | CEL    | Infeed conveyor costing |
-| `Sheet3!B11:B13`| `totals[J45:J47]`         | CEL    | Misc costing |
-| `Sheet1!B12`  | `pricing.margin`            | CEL    | Mirror of Summary!M4 |
+### 2.3 Frontend (UI Parity)
+- Recreate the **RDS inputs & pricing (Sheet1)**: identical inputs, data validation choices, and number formats.
+- Provide a **Costing/Sell Price List** readout view matching Excel’s visible fields.
 
-## Runbook
+---
 
-1. **Create virtual environment:** `python -m venv .venv` and `source .venv/bin/activate` (or `Scripts\activate` on Windows).
-2. **Install dependencies:** `pip install -r requirements.txt` (see README for the list). Windows users who need `.xlsb`/PDF exports must also install Microsoft Office (for COM automation) and `docx2pdf`.
-3. **Configure (optional):** Copy `config.example.json` to `config.json` and adjust paths for templates/output.
-4. **Ingest Workbook A:** `python scripts/ingest_rds.py "RDS Sales Tool -hrc.xlsm"` to populate `./.cache/spec/rds_spec.json`.
-5. **Run the app:** `flask --app backend.app:create_app run` (set `FLASK_ENV=development` for autoreload).
-6. **Run tests:** `pytest`.
+## 3) Test Harness (Windows-first; COM automation)
+- Runs 8 scenarios (margin change/reset, spares, guarding variants, USL/Badger toggles, transformers, training languages).
+- For each: computes Excel ground truth via COM; calls app endpoints; compares outputs with tolerances; produces CSV diffs and a Markdown REPORT.
 
-Outputs are written under `./output` following the naming convention described in the spec.
+See `tests/` and `REPORT.md` for details.
