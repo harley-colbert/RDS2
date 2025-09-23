@@ -18,6 +18,77 @@ body {
   color: #1f2933;
 }
 
+.tabbed-app {
+  width: min(1240px, 96vw);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2.5rem 2rem 3rem;
+}
+
+.tabbed-app__tabs {
+  display: inline-flex;
+  align-self: center;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(36, 46, 66, 0.12);
+  border-radius: 999px;
+  padding: 0.3rem;
+  box-shadow: 0 10px 20px rgba(36, 46, 66, 0.12);
+}
+
+.tabbed-app__tab {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #364154;
+  font-weight: 600;
+  padding: 0.65rem 1.6rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tabbed-app__tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(75, 103, 161, 0.35);
+}
+
+.tabbed-app__tab.is-active {
+  background: linear-gradient(135deg, #4b67a1, #6f8ed6);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(75, 103, 161, 0.35);
+}
+
+.tabbed-app__panels {
+  position: relative;
+}
+
+.tabbed-app__panel {
+  display: none;
+}
+
+.tabbed-app__panel.is-active {
+  display: block;
+}
+
+.tabbed-app__panel[hidden] {
+  display: none !important;
+}
+
+.tabbed-app__placeholder {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px dashed rgba(36, 46, 66, 0.2);
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  color: #5c6470;
+  text-align: center;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -31,7 +102,7 @@ body {
 }
 
 .app-shell {
-  width: min(1180px, 96vw);
+  width: 100%;
   display: grid;
   gap: 2rem;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));

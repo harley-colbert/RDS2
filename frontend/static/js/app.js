@@ -65,6 +65,8 @@ const totalsEls = {
   grand: document.getElementById('summary-grand'),
 };
 const optionsBreakdownBody = document.getElementById('options-breakdown-body');
+const tabButtons = Array.from(document.querySelectorAll('.tabbed-app__tab'));
+const tabContainer = document.querySelector('.tabbed-app');
 
 function announce(message) {
   if (!liveRegion) return;
@@ -440,6 +442,46 @@ async function init() {
   await loadCatalog();
   renderPricing(null);
   schedulePricingRequest();
+}
+
+function setActiveTab(targetId) {
+  const targetButton = tabButtons.find((button) => button.dataset.tabTarget === targetId);
+  if (!targetButton) {
+    return;
+  }
+
+  tabButtons.forEach((button) => {
+    const isActive = button === targetButton;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    const panelId = button.getAttribute('aria-controls');
+    const panel = panelId ? document.getElementById(panelId) : null;
+    if (!panel) {
+      return;
+    }
+    if (isActive) {
+      panel.classList.add('is-active');
+      panel.removeAttribute('hidden');
+    } else {
+      panel.classList.remove('is-active');
+      panel.setAttribute('hidden', '');
+    }
+  });
+
+  if (tabContainer) {
+    tabContainer.dataset.activeTab = targetId;
+  }
+}
+
+tabButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    setActiveTab(button.dataset.tabTarget);
+  });
+});
+
+if (tabButtons.length) {
+  const initialTab = tabContainer?.dataset.activeTab || tabButtons[0].dataset.tabTarget;
+  setActiveTab(initialTab);
 }
 
 if (resetButton) {
