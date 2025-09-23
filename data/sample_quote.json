@@ -1,0 +1,20 @@
+{
+  "quote_number": "Q1001",
+  "customer": "Sample Customer",
+  "data": {
+    "Sheet1": {
+      "B12": 0.2
+    },
+    "Sheet3": {
+      "C3": 1,
+      "C4": 1,
+      "C5": 1
+    }
+  },
+  "costing": {
+    "J4": {"description": "Base Frame", "quantity": 1, "unit_cost": 2500},
+    "J5": {"description": "Controls", "quantity": 1, "unit_cost": 1250},
+    "J18": {"description": "Infeed Primary", "quantity": 1, "unit_cost": 800},
+    "J38": {"description": "Spare Blades", "quantity": 2, "unit_cost": 150}
+  }
+}
