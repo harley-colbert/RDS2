@@ -1,3 +1,14 @@
-.venv
-.git
-.zip
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.zip
+*.xlsm
+*.xlsb
+*.xlsx
+*.docx
+*.pdf
+output/*
+!output/.gitkeep

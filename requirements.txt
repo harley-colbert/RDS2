@@ -1,0 +1,9 @@
+flask==3.0.2
+sqlalchemy==2.0.29
+python-docx==1.1.0
+openpyxl==3.1.2
+pytest==8.1.1
+
+# Optional dependencies
+# pywin32
+# docx2pdf

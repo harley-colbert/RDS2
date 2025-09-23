@@ -1,0 +1,9 @@
+{
+  "DATABASE_URL": "sqlite:///./data/rds.db",
+  "TEMPLATE_DIR": "./data/templates",
+  "OUTPUT_DIR": "./output",
+  "SPEC_CACHE": "./.cache/spec/rds_spec.json",
+  "EXCEL_TEMPLATE": "./data/templates/costing_template.xlsx",
+  "WORD_TEMPLATE": "./data/templates/proposal_template.docx",
+  "ALLOW_XLSB": false
+}
