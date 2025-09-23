@@ -13,7 +13,17 @@ def create_app(config_path: str | None = None) -> Flask:
     from .api import register_api
     """Application factory used by tests and runtime."""
     config = load_config(config_path)
-    app = Flask(__name__)
+    # The frontend is served by a blueprint that lives outside of the Flask
+    # package used for the API.  Flask enables its own static file handling by
+    # default which would intercept requests like ``/static/js/app.js`` before
+    # the blueprint gets a chance to serve them.  Those requests would then be
+    # looked up inside Flask's internal ``static`` folder (which we don't use),
+    # resulting in confusing 404 responses for legitimate frontend assets.
+    #
+    # Disabling the built-in static handling ensures that the blueprint mounted
+    # in ``run.configure_frontend`` is the sole owner of the ``/static``
+    # namespace and fixes the missing asset issue observed in the browser.
+    app = Flask(__name__, static_folder=None)
     app.config.update(config)
 
     init_db(app)
