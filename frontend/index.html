@@ -95,10 +95,20 @@
               </table>
 
               <section class="totals-card" aria-label="Quote totals">
-                <div class="totals-row">
-                  <span>Margin</span>
-                  <strong id="summary-margin">24.00%</strong>
+                <div class="totals-row totals-row--input">
+                  <label for="global-margin-input">Margin</label>
+                  <input
+                    id="global-margin-input"
+                    class="totals-input"
+                    type="text"
+                    inputmode="decimal"
+                    value="24%"
+                    aria-describedby="summary-margin-help"
+                  />
                 </div>
+                <p id="summary-margin-help" class="sr-only">
+                  Accepts decimal values (0.24) or percentages (24%).
+                </p>
                 <div class="totals-row">
                   <span>Base Price</span>
                   <strong id="summary-base">$0.00</strong>
@@ -145,9 +155,63 @@
           aria-labelledby="tab-summary"
           hidden
         >
-          <div class="tabbed-app__placeholder" role="presentation">
-            <h2>Costing Summary</h2>
-            <p>Coming soon.</p>
+          <div class="summary-screen">
+            <header class="summary-header">
+              <div class="summary-header__titles">
+                <h2>Cost Summary</h2>
+                <p>Mirrors Summary!A1:M59 with live bindings.</p>
+              </div>
+              <div class="summary-header__meta">
+                <span id="summary-global-pill" class="summary-pill">Global Margin: 0%</span>
+                <button id="summary-export" type="button" class="summary-action" aria-label="Export summary" disabled>
+                  Export
+                </button>
+                <button id="summary-print" type="button" class="summary-action" aria-label="Print summary" disabled>
+                  Print
+                </button>
+              </div>
+            </header>
+
+            <div class="summary-grid" role="region" aria-live="polite" aria-label="Cost summary grid">
+              <table class="summary-grid__table" aria-describedby="summary-grid-caption">
+                <caption id="summary-grid-caption" class="sr-only">Summary grid columns A through M</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Tab</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Tab Qty</th>
+                    <th scope="col">D</th>
+                    <th scope="col">E</th>
+                    <th scope="col">F</th>
+                    <th scope="col">G</th>
+                    <th scope="col">Qty / Selector</th>
+                    <th scope="col">Cost</th>
+                    <th scope="col">Sell Price</th>
+                    <th scope="col">Margin</th>
+                    <th scope="col">Override Margin</th>
+                    <th scope="col">Default Margin</th>
+                  </tr>
+                </thead>
+                <tbody id="summary-grid-body">
+                  <tr class="summary-grid__placeholder">
+                    <td colspan="13">No summary data available.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <footer class="summary-footer" aria-label="Summary totals">
+              <div class="summary-footer__group">
+                <span id="summary-lines" class="summary-footer__item">Lines: 0</span>
+                <span id="summary-overrides" class="summary-footer__item">Overrides: 0</span>
+                <span id="summary-overrides-percent" class="summary-footer__item">0%</span>
+              </div>
+              <div class="summary-footer__group">
+                <span id="summary-total-cost" class="summary-footer__item">Cost: $0.00</span>
+                <span id="summary-total-sell" class="summary-footer__item">Sell: $0.00</span>
+                <span id="summary-overall-margin" class="summary-footer__item">Margin: 0%</span>
+              </div>
+            </footer>
           </div>
         </section>
       </div>

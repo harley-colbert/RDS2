@@ -45,6 +45,8 @@ class CostingSummary(Base):
     margin: Mapped[float] = mapped_column(Float, default=0.0)
     toggles: Mapped[dict] = mapped_column(JSON, default=dict)
     totals: Mapped[dict] = mapped_column(JSON, default=dict)
+    grid_state: Mapped[list] = mapped_column(JSON, default=list)
+    quantities: Mapped[dict] = mapped_column(JSON, default=dict)
 
     rds_input: Mapped[RDSInput] = relationship("RDSInput", back_populates="costing_summary")
     items: Mapped[list["CostingItem"]] = relationship("CostingItem", back_populates="summary", cascade="all, delete-orphan")
@@ -62,6 +64,7 @@ class CostingItem(Base):
     category: Mapped[str] = mapped_column(String(50), default="base")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    override_margin: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     summary: Mapped[CostingSummary] = relationship("CostingSummary", back_populates="items")
 

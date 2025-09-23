@@ -15,6 +15,9 @@ const NUMERIC_FIELDS = new Set([
 ]);
 const ORIENTATION_FIELD = 'sys.infeed_orientation';
 const DEBOUNCE_MS = 150;
+const SUMMARY_DEBOUNCE_MS = 200;
+const DEFAULT_MARGIN = 0.24;
+const ACTIVE_QUOTE = 'Q-DEMO';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -36,16 +39,46 @@ function formatMargin(value) {
   return `${(numeric * 100).toFixed(2)}%`;
 }
 
+function parsePercentValue(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === 'number' && !Number.isNaN(value)) {
+    return value > 1 ? value / 100 : value;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+  const normalized = trimmed.replace(/%/g, '');
+  const numeric = Number(normalized);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+  if (trimmed.includes('%') || numeric > 1) {
+    return numeric / 100;
+  }
+  return numeric;
+}
+
+function clampMargin(value) {
+  return Math.min(Math.max(value, 0), 0.99);
+}
+
 const fieldRefs = new Map();
 let catalogDefaults = {};
 let catalogVersion = null;
 let debounceTimer = null;
 let pendingController = null;
+let summaryDebounceTimer = null;
+let pendingSummaryController = null;
 const state = {
   inputs: {},
   lastValidInputs: {},
   pricing: null,
   errors: {},
+  globalMargin: DEFAULT_MARGIN,
+  summary: null,
 };
 
 const liveRegion = document.getElementById('live-region');
@@ -59,7 +92,7 @@ const pricePerQtyEls = {
   pads: document.getElementById('price-per-qty-pads'),
 };
 const totalsEls = {
-  margin: document.getElementById('summary-margin'),
+  marginInput: document.getElementById('global-margin-input'),
   base: document.getElementById('summary-base'),
   options: document.getElementById('summary-options'),
   grand: document.getElementById('summary-grand'),
@@ -67,6 +100,16 @@ const totalsEls = {
 const optionsBreakdownBody = document.getElementById('options-breakdown-body');
 const tabButtons = Array.from(document.querySelectorAll('.tabbed-app__tab'));
 const tabContainer = document.querySelector('.tabbed-app');
+const summaryEls = {
+  body: document.getElementById('summary-grid-body'),
+  headerPill: document.getElementById('summary-global-pill'),
+  lines: document.getElementById('summary-lines'),
+  overrides: document.getElementById('summary-overrides'),
+  overridePercent: document.getElementById('summary-overrides-percent'),
+  totalCost: document.getElementById('summary-total-cost'),
+  totalSell: document.getElementById('summary-total-sell'),
+  overallMargin: document.getElementById('summary-overall-margin'),
+};
 
 function announce(message) {
   if (!liveRegion) return;
@@ -190,7 +233,12 @@ function renderPricePerQty(derived) {
 }
 
 function renderTotals(pricing) {
-  totalsEls.margin.textContent = formatMargin(pricing?.totals?.margin ?? 0);
+  if (totalsEls.marginInput) {
+    const marginValue = Number.isFinite(state.globalMargin)
+      ? state.globalMargin
+      : pricing?.totals?.margin ?? DEFAULT_MARGIN;
+    totalsEls.marginInput.value = formatMargin(marginValue);
+  }
   totalsEls.base.textContent = formatCurrency(pricing?.base ?? 0);
   totalsEls.options.textContent = formatCurrency(pricing?.totals?.options ?? 0);
   totalsEls.grand.textContent = formatCurrency(pricing?.totals?.grand ?? 0);
@@ -236,6 +284,330 @@ function renderOptionsBreakdown(options = []) {
 
     optionsBreakdownBody.appendChild(row);
   });
+}
+
+function buildSummaryFromResult(result) {
+  if (!result) {
+    return null;
+  }
+  return {
+    margin: result.margin,
+    totals: result.totals,
+    grid: result.grid,
+    footer: result.footer,
+    sell_map: result.sell_map,
+  };
+}
+
+function renderSummary(summary) {
+  if (!summaryEls.body) {
+    return;
+  }
+  if (summary) {
+    state.summary = summary;
+    if (typeof summary.margin === 'number') {
+      state.globalMargin = summary.margin;
+    }
+  }
+  const effectiveMargin = Number.isFinite(state.globalMargin)
+    ? state.globalMargin
+    : DEFAULT_MARGIN;
+  if (summaryEls.headerPill) {
+    summaryEls.headerPill.textContent = `Global Margin: ${formatMargin(effectiveMargin)}`;
+  }
+  renderSummaryRows(summary?.grid ?? []);
+  renderSummaryFooter(summary?.footer ?? {});
+  renderTotals(state.pricing);
+}
+
+function renderSummaryRows(rows = []) {
+  if (!summaryEls.body) {
+    return;
+  }
+  summaryEls.body.innerHTML = '';
+  if (!rows.length) {
+    const placeholder = document.createElement('tr');
+    placeholder.className = 'summary-grid__placeholder';
+    const cell = document.createElement('td');
+    cell.colSpan = 13;
+    cell.textContent = 'No summary data available.';
+    placeholder.appendChild(cell);
+    summaryEls.body.appendChild(placeholder);
+    return;
+  }
+
+  rows.forEach((row) => {
+    const tr = document.createElement('tr');
+    tr.dataset.rowIndex = String(row.rowIndex ?? '');
+    if (row.overrideL !== null && row.overrideL !== undefined) {
+      tr.dataset.overridden = 'true';
+    }
+
+    const tabCell = document.createElement('td');
+    tabCell.textContent = row.tab ?? '';
+    tr.appendChild(tabCell);
+
+    const description = document.createElement('th');
+    description.scope = 'row';
+    description.textContent = row.description ?? '';
+    tr.appendChild(description);
+
+    const tabQty = document.createElement('td');
+    tabQty.textContent = row.tabQty ?? '';
+    tr.appendChild(tabQty);
+
+    ['auxD', 'auxE', 'auxF', 'auxG'].forEach((key) => {
+      const cell = document.createElement('td');
+      cell.textContent = row[key] ?? '';
+      tr.appendChild(cell);
+    });
+
+    const qtyCell = document.createElement('td');
+    qtyCell.className = 'numeric';
+    qtyCell.textContent =
+      row.qtyH === null || row.qtyH === undefined || row.qtyH === ''
+        ? ''
+        : String(row.qtyH);
+    tr.appendChild(qtyCell);
+
+    const costCell = document.createElement('td');
+    costCell.className = 'numeric';
+    costCell.textContent = formatCurrency(row.costI ?? 0);
+    tr.appendChild(costCell);
+
+    const sellCell = document.createElement('td');
+    sellCell.className = 'numeric';
+    sellCell.textContent = formatCurrency(row.sellJ ?? 0);
+    tr.appendChild(sellCell);
+
+    const marginCell = document.createElement('td');
+    marginCell.className = 'numeric';
+    const effectiveMargin =
+      row.effMarginK === null || row.effMarginK === undefined
+        ? state.globalMargin ?? DEFAULT_MARGIN
+        : row.effMarginK;
+    marginCell.textContent = formatMargin(effectiveMargin);
+    tr.appendChild(marginCell);
+
+    const overrideCell = document.createElement('td');
+    if (row.isEditable) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'summary-override-input';
+      input.dataset.rowIndex = String(row.rowIndex ?? '');
+      if (row.overrideL !== null && row.overrideL !== undefined) {
+        input.value = formatMargin(row.overrideL);
+      } else {
+        input.value = '';
+      }
+      input.dataset.originalValue = input.value;
+      const placeholderMargin =
+        row.defaultM !== null && row.defaultM !== undefined
+          ? row.defaultM
+          : state.globalMargin ?? DEFAULT_MARGIN;
+      input.placeholder = formatMargin(placeholderMargin);
+      input.addEventListener('blur', onOverrideBlur);
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          input.blur();
+        }
+      });
+      overrideCell.appendChild(input);
+    }
+    tr.appendChild(overrideCell);
+
+    const defaultCell = document.createElement('td');
+    defaultCell.className = 'numeric';
+    if (row.defaultM !== null && row.defaultM !== undefined) {
+      defaultCell.textContent = formatMargin(row.defaultM);
+    }
+    tr.appendChild(defaultCell);
+
+    summaryEls.body.appendChild(tr);
+  });
+}
+
+function renderSummaryFooter(footer = {}) {
+  if (summaryEls.lines) {
+    summaryEls.lines.textContent = `Lines: ${footer.line_count ?? 0}`;
+  }
+  if (summaryEls.overrides) {
+    summaryEls.overrides.textContent = `Overrides: ${footer.override_count ?? 0}`;
+  }
+  if (summaryEls.overridePercent) {
+    summaryEls.overridePercent.textContent = formatMargin(footer.override_percent ?? 0);
+  }
+  if (summaryEls.totalCost) {
+    summaryEls.totalCost.textContent = `Cost: ${formatCurrency(footer.total_cost ?? 0)}`;
+  }
+  if (summaryEls.totalSell) {
+    summaryEls.totalSell.textContent = `Sell: ${formatCurrency(footer.total_sell ?? 0)}`;
+  }
+  if (summaryEls.overallMargin) {
+    summaryEls.overallMargin.textContent = `Margin: ${formatMargin(footer.overall_margin ?? 0)}`;
+  }
+}
+
+function scheduleSummarySync() {
+  if (!ACTIVE_QUOTE) {
+    return;
+  }
+  if (summaryDebounceTimer) {
+    clearTimeout(summaryDebounceTimer);
+  }
+  summaryDebounceTimer = setTimeout(() => {
+    syncSummary();
+  }, SUMMARY_DEBOUNCE_MS);
+}
+
+async function syncSummary() {
+  if (!ACTIVE_QUOTE) {
+    return;
+  }
+  if (pendingSummaryController) {
+    pendingSummaryController.abort();
+  }
+  pendingSummaryController = new AbortController();
+  const payload = {
+    data: { inputs: state.inputs },
+    margin: state.globalMargin,
+  };
+  try {
+    const response = await fetch(`/api/quote/${ACTIVE_QUOTE}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: pendingSummaryController.signal,
+    });
+    if (!response.ok) {
+      announce('Unable to update costing summary.');
+      return;
+    }
+    const result = await response.json();
+    if (result.inputs) {
+      state.inputs = { ...state.inputs, ...result.inputs };
+    }
+    const summary = buildSummaryFromResult(result.result) || result.summary;
+    if (summary) {
+      renderSummary(summary);
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      announce('Network error while syncing summary.');
+    }
+  } finally {
+    pendingSummaryController = null;
+  }
+}
+
+async function hydrateQuote() {
+  if (!ACTIVE_QUOTE) {
+    return;
+  }
+  try {
+    const response = await fetch(`/api/quote/${ACTIVE_QUOTE}`);
+    if (!response.ok) {
+      return;
+    }
+    const payload = await response.json();
+    const storedInputs = payload.inputs || {};
+    if (Object.keys(storedInputs).length) {
+      state.inputs = { ...catalogDefaults, ...storedInputs };
+      state.lastValidInputs = { ...state.inputs };
+      fieldRefs.forEach((ref, fieldId) => {
+        if (state.inputs[fieldId] !== undefined) {
+          updateSelectValue(fieldId, state.inputs[fieldId]);
+        }
+      });
+      if (state.inputs[ORIENTATION_FIELD]) {
+        setOrientationPreview(String(state.inputs[ORIENTATION_FIELD]));
+      }
+    }
+    const summary = buildSummaryFromResult(payload.result) || payload.summary;
+    if (summary) {
+      renderSummary(summary);
+    }
+  } catch (error) {
+    console.warn('Unable to hydrate quote', error);
+  }
+}
+
+function onOverrideBlur(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) {
+    return;
+  }
+  const rowIndex = Number.parseInt(input.dataset.rowIndex || '', 10);
+  if (!Number.isInteger(rowIndex)) {
+    return;
+  }
+  const rawValue = input.value.trim();
+  if (!rawValue) {
+    input.value = '';
+    input.dataset.originalValue = '';
+    commitOverride(rowIndex, null);
+    return;
+  }
+  const parsed = parsePercentValue(rawValue);
+  if (parsed === null) {
+    input.value = input.dataset.originalValue || '';
+    announce('Enter a valid override between 0% and 99%.');
+    return;
+  }
+  const clamped = clampMargin(parsed);
+  const formatted = formatMargin(clamped);
+  if (input.dataset.originalValue === formatted) {
+    input.value = formatted;
+    return;
+  }
+  input.value = formatted;
+  input.dataset.originalValue = formatted;
+  commitOverride(rowIndex, clamped);
+}
+
+async function commitOverride(rowIndex, override) {
+  try {
+    const response = await fetch(`/api/quote/${ACTIVE_QUOTE}/summary/${rowIndex}/override`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ override }),
+    });
+    if (!response.ok) {
+      announce('Unable to update override margin.');
+      return;
+    }
+    const payload = await response.json();
+    const summary = buildSummaryFromResult(payload);
+    if (summary) {
+      renderSummary(summary);
+    }
+  } catch (error) {
+    announce('Network error while updating override.');
+  }
+}
+
+function onMarginBlur(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) {
+    return;
+  }
+  const parsed = parsePercentValue(input.value);
+  if (parsed === null) {
+    input.value = formatMargin(state.globalMargin ?? DEFAULT_MARGIN);
+    announce('Enter a valid margin between 0% and 99%.');
+    return;
+  }
+  const clamped = clampMargin(parsed);
+  if (Math.abs(clamped - (state.globalMargin ?? DEFAULT_MARGIN)) < 0.0001) {
+    input.value = formatMargin(clamped);
+    return;
+  }
+  state.globalMargin = clamped;
+  input.value = formatMargin(clamped);
+  announce(`Global margin set to ${formatMargin(clamped)}.`);
+  renderSummary(state.summary);
+  scheduleSummarySync();
 }
 
 function renderPricing(pricing) {
@@ -341,6 +713,8 @@ function onFieldChange(dropdown, event) {
     return;
   }
 
+  scheduleSummarySync();
+
   if (!PRICE_DRIVING_FIELDS.has(dropdown.id)) {
     return;
   }
@@ -433,15 +807,23 @@ function resetToDefaults() {
   });
   setOrientationPreview(String(state.inputs[ORIENTATION_FIELD]));
   clearAllErrors();
+  state.globalMargin = DEFAULT_MARGIN;
+  if (totalsEls.marginInput) {
+    totalsEls.marginInput.value = formatMargin(DEFAULT_MARGIN);
+  }
   persistState();
   schedulePricingRequest();
+  scheduleSummarySync();
+  renderSummary(state.summary);
   announce('System options reset to defaults.');
 }
 
 async function init() {
   await loadCatalog();
+  await hydrateQuote();
   renderPricing(null);
   schedulePricingRequest();
+  scheduleSummarySync();
 }
 
 function setActiveTab(targetId) {
@@ -486,6 +868,16 @@ if (tabButtons.length) {
 
 if (resetButton) {
   resetButton.addEventListener('click', resetToDefaults);
+}
+
+if (totalsEls.marginInput) {
+  totalsEls.marginInput.addEventListener('blur', onMarginBlur);
+  totalsEls.marginInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      totalsEls.marginInput.blur();
+    }
+  });
 }
 
 init();

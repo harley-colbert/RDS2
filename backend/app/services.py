@@ -6,7 +6,7 @@ from typing import Any, Dict
 from sqlalchemy.orm import Session
 
 from .cel import CostingEmulationLayer, ensure_costing_summary
-from .models import CostingItem, CostingSummary, Pricing, RDSInput, UsageLog
+from .models import CostingSummary, Pricing, RDSInput, UsageLog
 from .excel import CostingWorkbookWriter
 from .word import ProposalWriter
 
@@ -26,7 +26,7 @@ CELL_TO_FIELD = {
 }
 
 SUMMARY_EXPORT_MAP = {
-    "Sheet3!B2": "base_total",
+    "Sheet3!B2": "base_sell_total",
     "Sheet3!B3": "J38",
     "Sheet3!B4": "J39",
     "Sheet3!B5": "J40",
@@ -49,7 +49,9 @@ class RDSService:
     def get_or_create_quote(self, quote_number: str, defaults: Dict[str, Any] | None = None) -> RDSInput:
         quote = self.session.query(RDSInput).filter_by(quote_number=quote_number).one_or_none()
         if quote is None:
-            quote = RDSInput(quote_number=quote_number, data=defaults or {}, customer=None)
+            payload = dict(defaults or {})
+            payload.setdefault("inputs", {})
+            quote = RDSInput(quote_number=quote_number, data=payload, customer=None)
             self.session.add(quote)
             self.session.flush()
             summary = ensure_costing_summary(self.session, quote)
@@ -58,7 +60,20 @@ class RDSService:
         return quote
 
     def update_input(self, quote: RDSInput, data: Dict[str, Any], customer: str | None = None) -> None:
-        quote.data = data
+        payload = quote.data or {}
+        if data:
+            for key, value in data.items():
+                if isinstance(value, dict):
+                    existing = payload.get(key)
+                    if not isinstance(existing, dict):
+                        existing = {}
+                    existing.update(value)
+                    payload[key] = existing
+                else:
+                    payload[key] = value
+        quote.data = payload
+        summary = ensure_costing_summary(self.session, quote)
+        self._sync_summary_quantities(summary, payload.get("inputs", {}))
         if customer is not None:
             quote.customer = customer
         self.session.add(quote)
@@ -71,16 +86,25 @@ class RDSService:
         pricing = quote.pricing
         if pricing is None:
             pricing = Pricing(rds_input=quote)
-        pricing.subtotal = result.summary_values.get("base_total", 0.0)
+        pricing.subtotal = result.footer.get("base_sell_total", 0.0)
         pricing.margin = result.margin
-        pricing.total = result.summary_values.get("sell_price", 0.0)
-        pricing.data = result.summary_values
+        pricing.total = result.footer.get("total_sell", 0.0)
+        pricing.data = {
+            **result.summary_values,
+            "sell_map": result.sell_map,
+            "cost_map": result.cost_map,
+            "footer": result.footer,
+        }
         self.session.add(pricing)
+        self._apply_summary_exports(quote, result)
         self.session.flush()
         return {
             "totals": result.summary_values,
             "margin": result.margin,
             "toggles": result.toggles,
+            "grid": result.grid,
+            "footer": result.footer,
+            "sell_map": result.sell_map,
         }
 
     def force_enable_options(self, quote: RDSInput) -> Dict[str, Any]:
@@ -99,6 +123,22 @@ class RDSService:
         CostingEmulationLayer.set_toggle(summary, cell, value)
         return self.recompute_costing(quote)
 
+    def set_summary_override(self, quote: RDSInput, row_index: int, override: float | None) -> Dict[str, Any]:
+        summary = ensure_costing_summary(self.session, quote)
+        item = next(
+            (i for i in summary.items if i.metadata_json.get("row_index") == row_index),
+            None,
+        )
+        if item is None:
+            raise ValueError(f"No summary row for index {row_index}")
+        if override is None:
+            item.override_margin = None
+        else:
+            item.override_margin = max(min(float(override), 0.99), 0.0)
+        self.session.add(item)
+        self.session.flush()
+        return self.recompute_costing(quote)
+
     def append_usage(self, quote: RDSInput | None, event: str, payload: Dict[str, Any]) -> None:
         log = UsageLog(rds_input=quote, event=event, payload=payload)
         self.session.add(log)
@@ -110,7 +150,73 @@ class RDSService:
             "margin": summary.margin,
             "toggles": summary.toggles,
             "totals": summary.totals,
+            "grid": summary.grid_state,
+            "footer": (summary.totals or {}).get("footer", {}),
+            "sell_map": (summary.totals or {}).get("sell_map", {}),
         }
+
+    def _sync_summary_quantities(self, summary: CostingSummary, inputs: Dict[str, Any]) -> None:
+        quantities = summary.quantities or {}
+
+        def set_quantity(cell: str | None, value: float) -> None:
+            if cell:
+                quantities[cell] = float(value)
+
+        def numeric(field: str) -> int:
+            try:
+                return int(inputs.get(field, 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        set_quantity("Summary!H38", numeric("sys.spare_parts_qty"))
+        set_quantity("Summary!H39", numeric("sys.spare_saw_blades_qty"))
+        set_quantity("Summary!H40", numeric("sys.spare_foam_pads_qty"))
+
+        guarding = inputs.get("sys.guarding")
+        set_quantity("Summary!H32", 1 if guarding == "Tall" else 0)
+        set_quantity("Summary!H33", 1 if guarding == "Tall w/ Netting" else 0)
+
+        feeding = inputs.get("sys.feeding_funneling")
+        set_quantity("Summary!H18", 1 if feeding in {"Front USL", "Front Badger"} else 0)
+        set_quantity("Summary!H19", 1 if feeding == "Side USL" else 0)
+        set_quantity("Summary!H20", 1 if feeding == "Side Badger" else 0)
+
+        transformer = inputs.get("sys.transformer")
+        set_quantity("Summary!H45", 1 if transformer == "Canada" else 0)
+        set_quantity("Summary!H46", 1 if transformer == "Step Up" else 0)
+
+        training = inputs.get("sys.training_lang")
+        set_quantity("Summary!H47", 1 if training == "English & Spanish" else 0)
+
+        summary.quantities = quantities
+        self.session.add(summary)
+
+    def _apply_summary_exports(self, quote: RDSInput, result) -> None:
+        payload = quote.data or {}
+        sheet3 = payload.get("Sheet3") if isinstance(payload.get("Sheet3"), dict) else {}
+        sheet1 = payload.get("Sheet1") if isinstance(payload.get("Sheet1"), dict) else {}
+
+        export_values: Dict[str, float] = {}
+        for cell, key in SUMMARY_EXPORT_MAP.items():
+            if key == "margin":
+                export_values[cell] = result.margin
+            elif key == "base_sell_total":
+                export_values[cell] = result.footer.get("base_sell_total", 0.0)
+            else:
+                export_values[cell] = result.sell_map.get(key, 0.0)
+
+        for cell, value in export_values.items():
+            sheet_name, address = cell.split("!")
+            if sheet_name == "Sheet3":
+                sheet3[address] = value
+            elif sheet_name == "Sheet1":
+                sheet1[address] = value
+
+        payload["Sheet3"] = sheet3
+        payload["Sheet1"] = sheet1
+        payload.setdefault("inputs", payload.get("inputs", {}))
+        quote.data = payload
+        self.session.add(quote)
 
     def ensure_seed_costing(self, quote: RDSInput, seed_data: Dict[str, Dict[str, Any]]) -> None:
         summary = ensure_costing_summary(self.session, quote)
@@ -201,6 +307,13 @@ class RDSService:
 
 def export_summary_for_workbook(totals: Dict[str, float]) -> Dict[str, float]:
     export: Dict[str, float] = {}
+    sell_map = totals.get("sell_map", {}) if isinstance(totals, dict) else {}
+    footer = totals.get("footer", {}) if isinstance(totals, dict) else {}
     for cell, key in SUMMARY_EXPORT_MAP.items():
-        export[cell] = totals.get(key, 0.0)
+        if key == "margin":
+            export[cell] = totals.get("margin", 0.0)
+        elif key == "base_sell_total":
+            export[cell] = footer.get("base_sell_total", 0.0)
+        else:
+            export[cell] = sell_map.get(key, totals.get(key, 0.0))
     return export

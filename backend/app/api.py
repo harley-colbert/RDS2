@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, Dict
+
 from flask import Blueprint, Flask, current_app, jsonify, request
 
 from .database import session_scope
@@ -23,22 +25,26 @@ def quote_detail(quote_number: str):
     with session_scope() as session:
         service = RDSService(session)
         quote = service.get_or_create_quote(quote_number)
+        result_payload: Dict[str, Any] | None = None
         if request.method == "POST":
             payload = request.json or {}
             service.update_input(quote, payload.get("data", {}), payload.get("customer"))
-            service.recompute_costing(quote, payload.get("margin"))
+            result_payload = service.recompute_costing(quote, payload.get("margin"))
             service.append_usage(quote, "update", payload)
+        summary_payload = service.summary_as_dict(quote)
         data = {
             "quote_number": quote.quote_number,
             "customer": quote.customer,
-            "inputs": quote.data,
+            "inputs": (quote.data or {}).get("inputs", {}),
+            "data": quote.data or {},
             "pricing": {
                 "base_total": quote.pricing.subtotal if quote.pricing else 0.0,
                 "margin": quote.pricing.margin if quote.pricing else 0.0,
                 "sell_price": quote.pricing.total if quote.pricing else 0.0,
                 "raw": quote.pricing.data if quote.pricing else {},
             },
-            "summary": service.summary_as_dict(quote),
+            "summary": summary_payload,
+            "result": result_payload,
         }
         return jsonify(data)
 
@@ -75,6 +81,31 @@ def toggle_cell(quote_number: str):
         quote = service.get_or_create_quote(quote_number)
         result = service.set_toggle(quote, cell, value)
         service.append_usage(quote, "toggle", {"cell": cell, "value": value})
+        return jsonify(result)
+
+
+@api.post("/quote/<quote_number>/summary/<int:row_index>/override")
+def summary_override(quote_number: str, row_index: int):
+    payload = request.json or {}
+    override_value = payload.get("override")
+    override = None
+    if override_value is not None and override_value != "":
+        try:
+            override = float(override_value)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid override"}), 400
+    with session_scope() as session:
+        service = RDSService(session)
+        quote = service.get_or_create_quote(quote_number)
+        try:
+            result = service.set_summary_override(quote, row_index, override)
+        except ValueError:
+            return jsonify({"error": "row not found"}), 404
+        service.append_usage(
+            quote,
+            "summary_override",
+            {"row_index": row_index, "override": override},
+        )
         return jsonify(result)
 
 
