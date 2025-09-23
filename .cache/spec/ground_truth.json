@@ -1,0 +1,52 @@
+{
+  "workbooks": {
+    "RDS Sales Tool (.xlsm)": {
+      "path": "./RDS Sales Tool -hrc.xlsm",
+      "sheets": "To be enumerated on your host (the harness is designed to rely on canonical mapping)",
+      "named_ranges": [],
+      "validations": [],
+      "conditional_formats": [],
+      "formulas": "Not required to guarantee parity because macros + canonical addresses define IO"
+    },
+    "Costing (.xlsb)": {
+      "path": "./Costing - hrc.xlsb",
+      "parsed": false,
+      "summary": "Binary workbook is driven by canonical Summary!Hxx and M4 inputs + Summary!Jxx reads."
+    }
+  },
+  "vba_mappings_canonical": {
+    "write_to_costing_summary": {
+      "SpareParts": { "H38": "Sheet1!B4", "H39": "Sheet1!B5", "H40": "Sheet1!B6" },
+      "Guarding": { "H32": "Sheet3!C6", "H33": "Sheet3!C7" },
+      "Infeed":   { "H18": "Sheet3!C8", "H19": "Sheet3!C9", "H20": "Sheet3!C10" },
+      "Misc":     { "H45": "Sheet3!C11", "H46": "Sheet3!C12", "H47": "Sheet3!C13" },
+      "Margin":   { "M4": "Sheet1!B12" }
+    },
+    "read_back_from_costing": {
+      "BaseCost_Sheet3_B2": "SUM(Summary!J4:J10) + Summary!J14 + J17 + J24 + J31",
+      "SpareParts": { "B3": "Summary!J38", "B4": "Summary!J39", "B5": "Summary!J40" },
+      "Guarding":   { "B6": "Summary!J32", "B7": "Summary!J33" },
+      "Infeed":     { "B8": "Summary!J18", "B9": "Summary!J19", "B10": "Summary!J20" },
+      "Misc":       { "B11": "Summary!J45", "B12": "Summary!J46", "B13": "Summary!J47" },
+      "MarginEcho": { "Sheet1!B12": "Summary!M4" }
+    },
+    "margin_toggle_force_ones": [ "H18","H19","H20","H32","H33","H38","H39","H40","H45","H46","H47" ],
+    "word_bookmark_sources": {
+      "Qty": "Sheet3!C3:C13",
+      "PriceText": "Sheet3!B2:B13",
+      "Bookmarks": [
+        "QuoteNum","Customer","Layout","BasePrice",
+        "SpareQty","SparePrice","BladeQty","BladePrice","FoamQty","FoamPrice",
+        "TallQty","TallPrice","NetQty","NetPrice","FrontUSLQty","FrontUSLPrice",
+        "SideUSLQty","SideUSLPrice","SideBadgerQty","SideBadgerPrice",
+        "CanadaQty","CanadaPrice","StepQty","StepPrice","TrainQty","TrainPrice",
+        "Date","User"
+      ]
+    },
+    "output_names": {
+      "costing_xlsb": "01 - Q#<Quote> - Costing.xlsb",
+      "proposal_docx": "Alliance Automation Proposal #<Quote> - Dismantling System.docx",
+      "proposal_pdf": "Alliance Automation Proposal #<Quote> - Dismantling System.pdf"
+    }
+  }
+}

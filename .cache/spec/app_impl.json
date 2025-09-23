@@ -1,0 +1,27 @@
+{
+  "repo": "rdsgen2.0 (zip/repo provided by user)",
+  "backend": {
+    "framework": "Flask or FastAPI (expected)",
+    "endpoints_expected": [
+      "POST /api/quote/compute",
+      "POST /api/quote/generate",
+      "GET  /health"
+    ]
+  },
+  "frontend": {
+    "ui_parity": [
+      "RDS inputs & pricing (Sheet1) with same validations/formatting",
+      "Sell Price List / Summary readouts (mirror fields and formats)"
+    ]
+  },
+  "db": {
+    "entities": [
+      "Quote(quote_number, customer, inputs..., margin, pricing slices..., outputs)",
+      "Audit/Log(optional)"
+    ]
+  },
+  "notes": [
+    "Replace SharePoint URLs with config-driven local paths for templates/output.",
+    "Ensure margin-change path forces H18,H19,H20,H32,H33,H38,H39,H40,H45,H46,H47=1 before recompute."
+  ]
+}
