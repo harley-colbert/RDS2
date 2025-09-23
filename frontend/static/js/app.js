@@ -1,35 +1,34 @@
-const CONFIG_ROWS = [
-  { label: 'Infeed Orientation', priceKey: 'J18', defaultOption: 'Centered' },
-  { label: 'Spare Parts Package', priceKey: 'J38', quantityCell: 'C3' },
-  { label: 'Spare Saw Blades', priceKey: 'J39', quantityCell: 'C4' },
-  { label: 'Spare Foam Pads', priceKey: 'J40', quantityCell: 'C5' },
-  { label: 'Guarding', priceKey: 'J32', defaultOption: 'Standard' },
-  { label: 'Feeding USL/Badger', priceKey: 'J19', defaultOption: 'Included' },
-  { label: 'Training', priceKey: 'J47', defaultOption: 'English' },
-];
-
-const quoteNumberInput = document.getElementById('quote-number');
-const customerInput = document.getElementById('customer-name');
-const configTextarea = document.getElementById('config-json');
-const configTableBody = document.getElementById('config-table-body');
-const baseCostEl = document.getElementById('quote-base-cost');
-const marginEl = document.getElementById('quote-margin');
-const sellPriceEl = document.getElementById('quote-sell-price');
-const optionsEl = document.getElementById('quote-options');
-const marginDialog = document.getElementById('margin-dialog');
-let currentQuote = quoteNumberInput?.value || 'Q12345';
+const STORAGE_KEY = 'rds.system-options.state';
+const PRICE_DRIVING_FIELDS = new Set([
+  'sys.spare_parts_qty',
+  'sys.spare_saw_blades_qty',
+  'sys.spare_foam_pads_qty',
+  'sys.guarding',
+  'sys.feeding_funneling',
+  'sys.transformer',
+  'sys.training_lang',
+]);
+const NUMERIC_FIELDS = new Set([
+  'sys.spare_parts_qty',
+  'sys.spare_saw_blades_qty',
+  'sys.spare_foam_pads_qty',
+]);
+const ORIENTATION_FIELD = 'sys.infeed_orientation';
+const DEBOUNCE_MS = 150;
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
   minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
 });
 
 function formatCurrency(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+  const numeric = Number(value ?? 0);
+  if (Number.isNaN(numeric)) {
     return '$0.00';
   }
-  return currencyFormatter.format(Number(value));
+  return currencyFormatter.format(numeric);
 }
 
 function formatMargin(value) {
@@ -37,163 +36,414 @@ function formatMargin(value) {
   return `${(numeric * 100).toFixed(2)}%`;
 }
 
-function getQuantity(inputs, cell) {
-  if (!cell) return null;
-  const sheet3 = inputs?.Sheet3;
-  if (!sheet3) return null;
-  if (!(cell in sheet3)) return null;
-  const quantity = sheet3[cell];
-  if (quantity === null || quantity === undefined) return null;
-  return quantity;
-}
+const fieldRefs = new Map();
+let catalogDefaults = {};
+let catalogVersion = null;
+let debounceTimer = null;
+let pendingController = null;
+const state = {
+  inputs: {},
+  lastValidInputs: {},
+  pricing: null,
+  errors: {},
+};
 
-function optionDisplayValue(row, inputs, summary) {
-  const quantity = getQuantity(inputs, row.quantityCell);
-  if (quantity !== null && quantity !== undefined) {
-    return String(quantity);
-  }
+const liveRegion = document.getElementById('live-region');
+const orientationVisual = document.getElementById('orientation-visual');
+const orientationLabel = document.getElementById('orientation-label');
+const formEl = document.getElementById('system-options-form');
+const resetButton = document.getElementById('reset-defaults');
+const pricePerQtyEls = {
+  parts: document.getElementById('price-per-qty-parts'),
+  blades: document.getElementById('price-per-qty-blades'),
+  pads: document.getElementById('price-per-qty-pads'),
+};
+const totalsEls = {
+  margin: document.getElementById('summary-margin'),
+  base: document.getElementById('summary-base'),
+  options: document.getElementById('summary-options'),
+  grand: document.getElementById('summary-grand'),
+};
+const optionsBreakdownBody = document.getElementById('options-breakdown-body');
 
-  if (typeof row.getValue === 'function') {
-    return row.getValue(inputs, summary);
-  }
-
-  return row.defaultOption ?? '';
-}
-
-async function fetchQuote() {
-  const response = await fetch(`/api/quote/${currentQuote}`);
-  const data = await response.json();
-  renderQuote(data);
-}
-
-function computeOptionsTotal(totals) {
-  const base = Number(totals?.base_total ?? 0);
-  const sell = Number(totals?.sell_price ?? 0);
-  if (!Number.isNaN(base) && !Number.isNaN(sell) && sell >= base) {
-    return sell - base;
-  }
-
-  return CONFIG_ROWS.reduce((sum, row) => sum + Number(totals?.[row.priceKey] ?? 0), 0);
-}
-
-function renderConfigRows(inputs, summary) {
-  const totals = summary?.totals || {};
-  configTableBody.innerHTML = '';
-
-  CONFIG_ROWS.forEach((row) => {
-    const tr = document.createElement('tr');
-
-    const descriptionCell = document.createElement('th');
-    descriptionCell.scope = 'row';
-    descriptionCell.textContent = row.label;
-
-    const optionCell = document.createElement('td');
-    optionCell.className = 'option-cell';
-    optionCell.textContent = optionDisplayValue(row, inputs, summary);
-
-    const priceCell = document.createElement('td');
-    priceCell.className = 'price-cell';
-    priceCell.textContent = formatCurrency(totals[row.priceKey]);
-
-    tr.appendChild(descriptionCell);
-    tr.appendChild(optionCell);
-    tr.appendChild(priceCell);
-
-    configTableBody.appendChild(tr);
+function announce(message) {
+  if (!liveRegion) return;
+  liveRegion.textContent = '';
+  requestAnimationFrame(() => {
+    liveRegion.textContent = message;
   });
 }
 
-function renderQuote(data) {
-  currentQuote = data.quote_number;
-  if (quoteNumberInput) quoteNumberInput.value = data.quote_number;
-  if (customerInput) customerInput.value = data.customer || '';
-  if (configTextarea) configTextarea.value = JSON.stringify(data.inputs ?? {}, null, 2);
-
-  const pricing = data.pricing || {};
-  const totals = data.summary?.totals || {};
-
-  baseCostEl.textContent = formatCurrency(pricing.base_total ?? totals.base_total);
-  sellPriceEl.textContent = formatCurrency(pricing.sell_price ?? totals.sell_price);
-  marginEl.textContent = formatMargin(pricing.margin ?? totals.margin ?? 0);
-  marginEl.dataset.margin = String(pricing.margin ?? totals.margin ?? 0);
-
-  const optionTotal = computeOptionsTotal({
-    base_total: pricing.base_total ?? totals.base_total,
-    sell_price: pricing.sell_price ?? totals.sell_price,
-    ...totals,
-  });
-  optionsEl.textContent = formatCurrency(optionTotal);
-
-  renderConfigRows(data.inputs || {}, data.summary);
-}
-
-if (quoteNumberInput) {
-  fetchQuote();
-}
-
-document.getElementById('btn-margin').addEventListener('click', () => {
-  const currentMargin = parseFloat(marginEl.dataset.margin || '0');
-  const marginInput = document.getElementById('margin-input');
-  if (marginInput) {
-    marginInput.value = Number.isNaN(currentMargin) ? '0.20' : currentMargin.toFixed(2);
-  }
-  marginDialog.showModal();
-});
-
-marginDialog.addEventListener('close', async () => {
-  if (marginDialog.returnValue !== 'confirm') return;
-  const marginValue = parseFloat(document.getElementById('margin-input').value);
-  if (Number.isNaN(marginValue)) {
-    alert('Enter a valid margin value');
-    return;
-  }
-  await fetch(`/api/quote/${currentQuote}/margin`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ margin: marginValue }),
-  });
-  fetchQuote();
-});
-
-document.getElementById('btn-reset-margin').addEventListener('click', async () => {
-  await fetch(`/api/quote/${currentQuote}/margin/reset`, { method: 'POST' });
-  fetchQuote();
-});
-
-document.getElementById('btn-generate-quote').addEventListener('click', async () => {
-  const response = await fetch(`/api/quote/${currentQuote}/generate`, { method: 'POST' });
-  const result = await response.json();
-  alert(`Generated quote files:\nCosting Workbook: ${result.costing}\nProposal Document: ${result.proposal_docx}`);
-});
-
-document.getElementById('btn-generate-layout').addEventListener('click', async () => {
-  const response = await fetch(`/api/quote/${currentQuote}/generate`, { method: 'POST' });
-  const result = await response.json();
-  alert(`Layout export ready at:\n${result.proposal_pdf}`);
-});
-
-document.getElementById('save-inputs').addEventListener('click', async () => {
-  const quoteNumber = quoteNumberInput.value.trim();
-  if (!quoteNumber) {
-    alert('Quote number is required');
-    return;
-  }
-  currentQuote = quoteNumber;
-
-  const customer = customerInput.value;
-  let parsed;
+function persistState() {
   try {
-    parsed = JSON.parse(configTextarea.value || '{}');
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state.inputs));
   } catch (error) {
-    alert('Configuration JSON is invalid');
+    console.warn('Unable to persist session state', error); // eslint-disable-line no-console
+  }
+}
+
+function sanitizeStoredInputs(dropdowns) {
+  const defaults = {};
+  dropdowns.forEach((dropdown) => {
+    defaults[dropdown.id] = dropdown.default;
+  });
+
+  let stored = null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      stored = JSON.parse(raw);
+    }
+  } catch (error) {
+    stored = null;
+  }
+
+  const hydrated = { ...defaults };
+  if (stored && typeof stored === 'object') {
+    dropdowns.forEach((dropdown) => {
+      const value = stored[dropdown.id];
+      if (dropdown.options.includes(value)) {
+        hydrated[dropdown.id] = value;
+        return;
+      }
+      if (NUMERIC_FIELDS.has(dropdown.id)) {
+        const numeric = Number(value);
+        if (!Number.isNaN(numeric) && dropdown.options.includes(numeric)) {
+          hydrated[dropdown.id] = numeric;
+        }
+        return;
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (dropdown.options.includes(trimmed)) {
+          hydrated[dropdown.id] = trimmed;
+        }
+      }
+    });
+  }
+
+  return { defaults, hydrated };
+}
+
+function setOrientationPreview(value) {
+  if (!orientationVisual || !orientationLabel) return;
+  orientationVisual.classList.remove(
+    'orientation-visual--left',
+    'orientation-visual--centered',
+    'orientation-visual--right',
+  );
+  const className = `orientation-visual--${value.toLowerCase()}`;
+  orientationVisual.classList.add(className);
+  orientationLabel.textContent = `${value} orientation`;
+  orientationVisual.setAttribute('aria-label', `${value} orientation illustration`);
+}
+
+function getFieldElements(fieldId) {
+  return fieldRefs.get(fieldId);
+}
+
+function setFieldError(fieldId, message) {
+  const ref = getFieldElements(fieldId);
+  if (!ref) return;
+  if (message) {
+    ref.container.dataset.error = 'true';
+    ref.error.textContent = message;
+  } else {
+    ref.container.dataset.error = 'false';
+    ref.error.textContent = '';
+  }
+}
+
+function clearAllErrors() {
+  state.errors = {};
+  fieldRefs.forEach(({ container, error }) => {
+    container.dataset.error = 'false';
+    error.textContent = '';
+  });
+}
+
+function normalizeValue(fieldId, value) {
+  if (NUMERIC_FIELDS.has(fieldId)) {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) {
+      return null;
+    }
+    return numeric;
+  }
+  return value;
+}
+
+function updateSelectValue(fieldId, value) {
+  const ref = getFieldElements(fieldId);
+  if (!ref) return;
+  ref.select.value = String(value);
+}
+
+function renderPricePerQty(derived) {
+  if (!derived) return;
+  Object.entries(pricePerQtyEls).forEach(([key, element]) => {
+    if (!element) return;
+    element.textContent = formatCurrency(derived[key]);
+  });
+}
+
+function renderTotals(pricing) {
+  totalsEls.margin.textContent = formatMargin(pricing?.totals?.margin ?? 0);
+  totalsEls.base.textContent = formatCurrency(pricing?.base ?? 0);
+  totalsEls.options.textContent = formatCurrency(pricing?.totals?.options ?? 0);
+  totalsEls.grand.textContent = formatCurrency(pricing?.totals?.grand ?? 0);
+}
+
+function renderOptionsBreakdown(options = []) {
+  optionsBreakdownBody.innerHTML = '';
+  if (!options.length) {
+    const row = document.createElement('tr');
+    row.className = 'placeholder';
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.textContent = 'No optional adders selected.';
+    row.appendChild(cell);
+    optionsBreakdownBody.appendChild(row);
     return;
   }
 
-  const response = await fetch(`/api/quote/${quoteNumber}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: parsed, customer }),
+  options.forEach((option) => {
+    const row = document.createElement('tr');
+
+    const description = document.createElement('th');
+    description.scope = 'row';
+    description.textContent = option.label;
+
+    const qty = document.createElement('td');
+    qty.textContent = String(option.qty);
+
+    const unit = document.createElement('td');
+    unit.className = 'numeric';
+    unit.textContent = formatCurrency(option.unit);
+    unit.title = option.unit.toString();
+
+    const extended = document.createElement('td');
+    extended.className = 'numeric';
+    extended.textContent = formatCurrency(option.extended);
+    extended.title = option.extended.toString();
+
+    row.appendChild(description);
+    row.appendChild(qty);
+    row.appendChild(unit);
+    row.appendChild(extended);
+
+    optionsBreakdownBody.appendChild(row);
   });
-  const data = await response.json();
-  renderQuote(data);
-});
+}
+
+function renderPricing(pricing) {
+  if (!pricing) return;
+  renderPricePerQty(pricing.derived?.price_per_qty);
+  renderTotals(pricing);
+  renderOptionsBreakdown(pricing.options);
+}
+
+function schedulePricingRequest() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer = setTimeout(() => {
+    requestPricing();
+  }, DEBOUNCE_MS);
+}
+
+async function requestPricing() {
+  if (pendingController) {
+    pendingController.abort();
+  }
+  pendingController = new AbortController();
+  const body = JSON.stringify({ inputs: state.inputs });
+  try {
+    const response = await fetch('/api/price', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(catalogVersion ? { 'X-Catalog-Version': catalogVersion } : {}),
+      },
+      body,
+      signal: pendingController.signal,
+    });
+
+    if (response.status === 409) {
+      const payload = await response.json().catch(() => ({}));
+      if (payload.version && payload.version !== catalogVersion) {
+        await loadCatalog(true);
+        return requestPricing();
+      }
+      announce('Pricing catalog mismatch. Refreshed defaults.');
+      return;
+    }
+
+    if (response.status === 400) {
+      const payload = await response.json().catch(() => ({}));
+      if (payload.field) {
+        const fallback = state.lastValidInputs[payload.field] ?? catalogDefaults[payload.field];
+        if (fallback !== undefined) {
+          state.inputs[payload.field] = fallback;
+          updateSelectValue(payload.field, fallback);
+          if (payload.field === ORIENTATION_FIELD) {
+            setOrientationPreview(String(fallback));
+          }
+        }
+        state.errors[payload.field] = payload.error || 'Invalid value';
+        setFieldError(payload.field, payload.error || 'Invalid value');
+      }
+      announce(payload.error || 'Unable to update pricing.');
+      persistState();
+      return;
+    }
+
+    if (!response.ok) {
+      announce('Unable to compute pricing at this time.');
+      return;
+    }
+
+    const payload = await response.json();
+    catalogVersion = response.headers.get('X-Catalog-Version') || catalogVersion;
+    state.pricing = payload;
+    state.lastValidInputs = { ...state.inputs };
+    clearAllErrors();
+    persistState();
+    renderPricing(payload);
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      return;
+    }
+    announce('Network error while requesting pricing.');
+  } finally {
+    pendingController = null;
+  }
+}
+
+function onFieldChange(dropdown, event) {
+  const rawValue = event.target.value;
+  const normalized = normalizeValue(dropdown.id, rawValue);
+  if (normalized === null) {
+    setFieldError(dropdown.id, 'Enter a valid value.');
+    updateSelectValue(dropdown.id, state.inputs[dropdown.id]);
+    return;
+  }
+
+  state.inputs[dropdown.id] = normalized;
+  setFieldError(dropdown.id, '');
+  persistState();
+
+  if (dropdown.id === ORIENTATION_FIELD) {
+    setOrientationPreview(String(normalized));
+    announce(`Infeed orientation set to ${normalized}.`);
+    return;
+  }
+
+  if (!PRICE_DRIVING_FIELDS.has(dropdown.id)) {
+    return;
+  }
+
+  schedulePricingRequest();
+}
+
+function buildForm(dropdowns) {
+  formEl.innerHTML = '';
+  fieldRefs.clear();
+
+  dropdowns.forEach((dropdown) => {
+    const container = document.createElement('div');
+    container.className = 'form-field';
+    container.dataset.fieldId = dropdown.id;
+    container.dataset.error = 'false';
+
+    const label = document.createElement('label');
+    const inputId = `field-${dropdown.id.replace(/\./g, '-')}`;
+    label.setAttribute('for', inputId);
+    label.textContent = dropdown.label;
+
+    const select = document.createElement('select');
+    select.id = inputId;
+    select.dataset.fieldId = dropdown.id;
+
+    dropdown.options.forEach((option) => {
+      const optionEl = document.createElement('option');
+      optionEl.value = String(option);
+      optionEl.textContent = typeof option === 'number' ? option.toString() : option;
+      select.appendChild(optionEl);
+    });
+
+    const describedBy = [];
+
+    if (dropdown.tooltip) {
+      const help = document.createElement('p');
+      help.id = `${inputId}-help`;
+      help.className = 'form-field__help';
+      help.textContent = dropdown.tooltip;
+      container.appendChild(help);
+      describedBy.push(help.id);
+    }
+
+    const error = document.createElement('p');
+    error.id = `${inputId}-error`;
+    error.className = 'form-field__error';
+    container.appendChild(error);
+    describedBy.push(error.id);
+
+    if (describedBy.length) {
+      select.setAttribute('aria-describedby', describedBy.join(' '));
+    }
+
+    select.value = String(state.inputs[dropdown.id]);
+    select.addEventListener('change', onFieldChange.bind(null, dropdown));
+
+    container.insertBefore(label, container.firstChild);
+    container.insertBefore(select, container.children[1]);
+
+    formEl.appendChild(container);
+
+    fieldRefs.set(dropdown.id, { container, select, error });
+  });
+}
+
+async function loadCatalog(force = false) {
+  if (!force && catalogVersion && formEl.children.length) {
+    return;
+  }
+  const response = await fetch('/api/dropdowns');
+  const payload = await response.json();
+  catalogVersion = response.headers.get('X-Catalog-Version') || payload.version || catalogVersion;
+
+  const { defaults, hydrated } = sanitizeStoredInputs(payload.dropdowns || []);
+  catalogDefaults = defaults;
+  state.inputs = hydrated;
+  state.lastValidInputs = { ...hydrated };
+
+  buildForm(payload.dropdowns || []);
+  setOrientationPreview(String(state.inputs[ORIENTATION_FIELD]));
+  persistState();
+}
+
+function resetToDefaults() {
+  state.inputs = { ...catalogDefaults };
+  state.lastValidInputs = { ...catalogDefaults };
+  fieldRefs.forEach((ref, fieldId) => {
+    updateSelectValue(fieldId, state.inputs[fieldId]);
+  });
+  setOrientationPreview(String(state.inputs[ORIENTATION_FIELD]));
+  clearAllErrors();
+  persistState();
+  schedulePricingRequest();
+  announce('System options reset to defaults.');
+}
+
+async function init() {
+  await loadCatalog();
+  renderPricing(null);
+  schedulePricingRequest();
+}
+
+if (resetButton) {
+  resetButton.addEventListener('click', resetToDefaults);
+}
+
+init();
