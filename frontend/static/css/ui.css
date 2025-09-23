@@ -1,0 +1,258 @@
+:root {
+  color-scheme: light;
+  font-family: "Calibri", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background-color: #e9ecf3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e9ecf3;
+  color: #2b2b2b;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.workspace {
+  width: min(720px, 90vw);
+  padding: 2.5rem 2rem;
+}
+
+.quote-card {
+  background: #ffffff;
+  border: 1px solid #c5c9d3;
+  border-radius: 6px;
+  box-shadow: 0 12px 18px rgba(0, 0, 0, 0.08);
+  padding: 2rem 2.25rem 2.5rem;
+}
+
+.quote-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1.5rem;
+}
+
+.quote-header h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #1c1c1c;
+}
+
+.quote-header p {
+  font-size: 1rem;
+  color: #6b6f79;
+}
+
+.table-wrapper {
+  border: 1px solid #cfcfcf;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+thead th {
+  background: #d9d9d9;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  color: #2b2b2b;
+  padding: 0.9rem 1rem;
+  border-right: 1px solid #b8b8b8;
+}
+
+thead th:last-child {
+  border-right: none;
+  text-align: right;
+}
+
+tbody tr {
+  background: #fefefe;
+}
+
+tbody tr:nth-child(odd) {
+  background: #f9f7ef;
+}
+
+td,
+th[scope="row"] {
+  border-top: 1px solid #d5d5d5;
+  border-right: 1px solid #d5d5d5;
+  padding: 0.85rem 1rem;
+  vertical-align: middle;
+}
+
+td:last-child {
+  border-right: none;
+}
+
+tbody th[scope="row"] {
+  font-weight: 600;
+  color: #222;
+  text-align: left;
+}
+
+tbody td.option-cell {
+  background: #f8eac5;
+  color: #3a3122;
+}
+
+tbody td.price-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #1f2933;
+}
+
+.totals {
+  margin-top: 1.75rem;
+  border: 1px solid #d1cfc4;
+  background: #fdf6e3;
+  border-radius: 4px;
+  padding: 1rem 1.25rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.totals-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1rem;
+}
+
+.totals-row strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.totals-row--total {
+  border-top: 1px solid #d2ceb6;
+  padding-top: 0.65rem;
+  margin-top: 0.4rem;
+  font-size: 1.05rem;
+}
+
+.actions {
+  margin-top: 2rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.actions button {
+  background: #d7d7d7;
+  border: 1px solid #b7b7b7;
+  border-radius: 4px;
+  padding: 0.9rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: #2d2d2d;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.actions button:hover,
+.actions button:focus-visible {
+  background: #bebebe;
+  transform: translateY(-1px);
+}
+
+.margin-dialog {
+  border: 1px solid #b5b8c2;
+  border-radius: 6px;
+  padding: 1.5rem;
+  box-shadow: 0 18px 32px rgba(23, 26, 33, 0.22);
+}
+
+.margin-dialog form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.margin-dialog h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.margin-dialog label {
+  font-size: 0.95rem;
+}
+
+.margin-dialog input[type="number"] {
+  padding: 0.5rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #c5c5c5;
+  font-size: 1rem;
+}
+
+.margin-dialog menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+}
+
+.margin-dialog button {
+  padding: 0.55rem 1.2rem;
+  border-radius: 4px;
+  border: 1px solid #b5b5b5;
+  background: #f5f5f5;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.margin-dialog button[value="confirm"] {
+  background: #5c83d6;
+  border-color: #4e70bd;
+  color: #ffffff;
+}
+
+.margin-dialog button:hover,
+.margin-dialog button:focus-visible {
+  filter: brightness(0.95);
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .quote-card {
+    padding: 1.5rem;
+  }
+
+  thead th,
+  td,
+  th[scope="row"] {
+    padding: 0.75rem;
+  }
+
+  .actions button {
+    font-size: 0.95rem;
+  }
+}

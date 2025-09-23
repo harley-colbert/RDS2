@@ -4,164 +4,80 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>RDS Local Sales Tool</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/ui.css" />
     <script defer src="/static/js/app.js"></script>
   </head>
-  <body class="bg-slate-100 min-h-screen">
-    <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
-      <header class="mb-2">
-        <h1 class="text-3xl font-semibold text-slate-800">RDS Sales Tool</h1>
-        <p class="text-slate-500">
-          Configure proposals, review system pricing, and generate workbook outputs in one place.
-        </p>
-      </header>
+  <body>
+    <main class="workspace">
+      <section class="quote-card">
+        <header class="quote-header">
+          <h1>System Options</h1>
+          <p>Price Per Qty</p>
+        </header>
 
-      <main class="space-y-6">
-        <section class="bg-white shadow rounded-lg p-6 space-y-4">
-          <header class="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 class="text-xl font-semibold text-slate-800">Quote Overview</h2>
-              <p class="text-slate-500 text-sm">Edit customer details before adjusting system options.</p>
-            </div>
-            <div class="text-sm text-slate-500">
-              <span>Server running on port 5234</span>
-            </div>
-          </header>
+        <div class="table-wrapper">
+          <table aria-labelledby="pricing-table-title">
+            <caption id="pricing-table-title" class="sr-only">Configured System Options and Pricing</caption>
+            <thead>
+              <tr>
+                <th scope="col">Description</th>
+                <th scope="col">System Options</th>
+                <th scope="col">Price Per Qty</th>
+              </tr>
+            </thead>
+            <tbody id="config-table-body"></tbody>
+          </table>
+        </div>
 
-          <form id="inputs-form" class="grid gap-4 md:grid-cols-3">
-            <label class="flex flex-col gap-1 text-sm text-slate-700">
-              <span>Quote Number</span>
-              <input
-                id="quote-number"
-                type="text"
-                name="quote_number"
-                class="border border-slate-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-                value="Q12345"
-              />
-            </label>
-            <label class="flex flex-col gap-1 text-sm text-slate-700">
-              <span>Customer</span>
-              <input
-                id="customer-name"
-                type="text"
-                name="customer"
-                class="border border-slate-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-              />
-            </label>
-            <div class="flex items-end">
-              <button
-                type="button"
-                id="save-inputs"
-                class="bg-blue-600 hover:bg-blue-700 transition text-white px-4 py-2 rounded w-full"
-              >
-                Save &amp; Recompute
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section class="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <div class="bg-white shadow rounded-lg p-6 space-y-6">
-            <header class="flex items-center justify-between flex-wrap gap-4">
-              <h2 class="text-xl font-semibold text-slate-800">System Options &amp; Pricing</h2>
-              <span class="text-sm text-slate-500">Values mirror the RDS Sales Tool workbook</span>
-            </header>
-
-            <div class="overflow-x-auto border border-slate-200 rounded-lg">
-              <table class="min-w-full divide-y divide-slate-200 text-sm" aria-describedby="quote-base-cost">
-                <thead class="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
-                  <tr>
-                    <th scope="col" class="px-4 py-2 text-left">Description</th>
-                    <th scope="col" class="px-4 py-2 text-left">System Options</th>
-                    <th scope="col" class="px-4 py-2 text-right">Price Per Qty</th>
-                  </tr>
-                </thead>
-                <tbody id="config-table-body" class="divide-y divide-slate-200 bg-white"></tbody>
-              </table>
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-3">
-              <div class="rounded-lg border border-slate-200 p-4 text-center">
-                <p class="text-xs uppercase tracking-wide text-slate-500">Base Cost</p>
-                <p id="quote-base-cost" class="text-lg font-semibold text-slate-800">$0.00</p>
-              </div>
-              <div class="rounded-lg border border-slate-200 p-4 text-center">
-                <p class="text-xs uppercase tracking-wide text-slate-500">Margin</p>
-                <p id="quote-margin" data-margin="0" class="text-lg font-semibold text-slate-800">0.00%</p>
-              </div>
-              <div class="rounded-lg border border-slate-200 p-4 text-center">
-                <p class="text-xs uppercase tracking-wide text-slate-500">Sell Price</p>
-                <p id="quote-sell-price" class="text-lg font-semibold text-slate-800">$0.00</p>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-3">
-              <button id="btn-margin" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded">Change Margin</button>
-              <button id="btn-reset-margin" class="bg-slate-500 hover:bg-slate-600 text-white px-4 py-2 rounded">Reset Margin</button>
-              <button id="btn-generate" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">Generate Outputs</button>
-            </div>
+        <section class="totals" aria-label="Quote totals">
+          <div class="totals-row">
+            <span>Margin</span>
+            <strong id="quote-margin" data-margin="0">0.00%</strong>
           </div>
-
-          <div class="space-y-6">
-            <section class="bg-white shadow rounded-lg p-6 space-y-4">
-              <h2 class="text-lg font-semibold text-slate-800">System Layout Preview</h2>
-              <div
-                id="layout-preview"
-                class="aspect-[4/3] w-full rounded border-2 border-dashed border-slate-300 flex items-center justify-center text-center text-slate-400 bg-slate-50"
-              >
-                <p class="max-w-[16rem] text-sm">Upload a layout image via the configuration JSON to mirror the proposal workbook.</p>
-              </div>
-            </section>
-
-            <section class="bg-white shadow rounded-lg p-6 space-y-3 text-sm text-slate-600">
-              <h2 class="text-lg font-semibold text-slate-800">Quote Notes</h2>
-              <p>
-                Quantities originate from <code>Sheet3!C*</code> cells in the workbook. Toggle an option to include or remove it
-                from the costing rollup.
-              </p>
-              <p>
-                Margin adjustments update <code>Summary!M4</code> and will reflect across generated Excel and Word outputs.
-              </p>
-            </section>
+          <div class="totals-row">
+            <span>Base Price</span>
+            <strong id="quote-base-cost">$0.00</strong>
+          </div>
+          <div class="totals-row">
+            <span>Options</span>
+            <strong id="quote-options">$0.00</strong>
+          </div>
+          <div class="totals-row totals-row--total">
+            <span>Total</span>
+            <strong id="quote-sell-price">$0.00</strong>
           </div>
         </section>
 
-        <details class="bg-white shadow rounded-lg" open>
-          <summary class="cursor-pointer select-none px-6 py-4 text-sm font-semibold text-slate-700">Advanced Configuration JSON</summary>
-          <div class="border-t border-slate-200 p-6 space-y-3">
-            <label class="flex flex-col gap-2 text-sm text-slate-700">
-              <span>Raw Workbook Data</span>
-              <textarea
-                id="config-json"
-                name="data"
-                class="border border-slate-300 rounded px-3 py-2 h-52 font-mono text-xs focus:outline-none focus:ring focus:ring-blue-200"
-              >{"cells": {}}</textarea>
-            </label>
-            <p class="text-xs text-slate-500">
-              Paste structured workbook data to seed <code>Sheet1</code> / <code>Sheet3</code> cells. Values persist in the local
-              database once saved.
-            </p>
-          </div>
-        </details>
-      </main>
-    </div>
+        <section class="actions" aria-label="Quote actions">
+          <button id="btn-margin" type="button">Change Margin</button>
+          <button id="btn-reset-margin" type="button">Reset Margin</button>
+          <button id="btn-generate-quote" type="button">Generate Quote</button>
+          <button id="btn-generate-layout" type="button">Generate Layout</button>
+        </section>
+      </section>
 
-    <dialog id="margin-dialog" class="rounded border border-slate-200 p-6 shadow-lg">
-      <form method="dialog" class="space-y-4">
-        <h2 class="text-lg font-semibold text-slate-800">Update Margin</h2>
-        <label class="flex flex-col gap-1 text-sm text-slate-700">
-          <span>Margin (decimal)</span>
-          <input
-            type="number"
-            step="0.01"
-            id="margin-input"
-            class="border border-slate-300 rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-200"
-          />
+      <form id="inputs-form" class="sr-only" aria-hidden="true">
+        <label>
+          <span>Quote Number</span>
+          <input id="quote-number" type="text" name="quote_number" value="Q12345" />
         </label>
-        <menu class="flex gap-2 justify-end">
-          <button value="cancel" class="px-3 py-1 rounded border border-slate-300">Cancel</button>
-          <button value="confirm" class="px-3 py-1 rounded bg-blue-600 text-white">Save</button>
+        <label>
+          <span>Customer</span>
+          <input id="customer-name" type="text" name="customer" />
+        </label>
+        <textarea id="config-json" name="data">{"cells": {}}</textarea>
+        <button type="button" id="save-inputs">Save &amp; Recompute</button>
+      </form>
+    </main>
+
+    <dialog id="margin-dialog" class="margin-dialog">
+      <form method="dialog">
+        <h2>Update Margin</h2>
+        <label for="margin-input">Margin (decimal)</label>
+        <input type="number" step="0.01" id="margin-input" />
+        <menu>
+          <button value="cancel" type="reset">Cancel</button>
+          <button value="confirm" type="submit">Save</button>
         </menu>
       </form>
     </dialog>
