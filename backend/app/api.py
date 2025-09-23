@@ -5,6 +5,14 @@ from flask import Blueprint, Flask, current_app, jsonify, request
 from .database import session_scope
 from .models import RDSInput
 from .services import RDSService
+from .system_options import (
+    CATALOG_VERSION,
+    PricingValidationError,
+    catalog_payload,
+    compute_pricing,
+    dropdown_payload,
+    validate_inputs,
+)
 
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -82,3 +90,40 @@ def generate_outputs(quote_number: str):
 
 def register_api(app: Flask) -> None:
     app.register_blueprint(api)
+def _with_catalog_header(response):
+    response.headers["X-Catalog-Version"] = CATALOG_VERSION
+    return response
+
+
+@api.get("/dropdowns")
+def dropdown_catalog():
+    response = jsonify(catalog_payload())
+    return _with_catalog_header(response)
+
+
+@api.get("/dropdowns/<dropdown_id>")
+def dropdown_detail(dropdown_id: str):
+    payload = dropdown_payload(dropdown_id)
+    if payload is None:
+        return _with_catalog_header(jsonify({"error": "not found"})), 404
+    response = jsonify(payload)
+    return _with_catalog_header(response)
+
+
+@api.post("/price")
+def price_quote():
+    client_version = request.headers.get("X-Catalog-Version")
+    if client_version and client_version != CATALOG_VERSION:
+        response = jsonify({"error": "stale catalog", "version": CATALOG_VERSION})
+        return _with_catalog_header(response), 409
+
+    payload = request.json or {}
+    try:
+        inputs = validate_inputs(payload)
+    except PricingValidationError as exc:
+        response = jsonify({"error": str(exc), "field": exc.field})
+        return _with_catalog_header(response), 400
+
+    pricing = compute_pricing(inputs)
+    response = jsonify(pricing)
+    return _with_catalog_header(response)

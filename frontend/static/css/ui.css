@@ -12,10 +12,10 @@ body {
   margin: 0;
   min-height: 100vh;
   display: flex;
-  align-items: center;
   justify-content: center;
-  background-color: #e9ecf3;
-  color: #2b2b2b;
+  align-items: center;
+  background: linear-gradient(145deg, #edf1f9, #d6dce8);
+  color: #1f2933;
 }
 
 .sr-only {
@@ -30,229 +30,267 @@ body {
   border: 0;
 }
 
-.workspace {
-  width: min(720px, 90vw);
-  padding: 2.5rem 2rem;
+.app-shell {
+  width: min(1180px, 96vw);
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  padding: 3rem 2.5rem;
 }
 
-.quote-card {
+.screen {
   background: #ffffff;
-  border: 1px solid #c5c9d3;
-  border-radius: 6px;
-  box-shadow: 0 12px 18px rgba(0, 0, 0, 0.08);
-  padding: 2rem 2.25rem 2.5rem;
-}
-
-.quote-header {
+  border-radius: 12px;
+  border: 1px solid rgba(36, 46, 66, 0.12);
+  box-shadow: 0 18px 32px rgba(36, 46, 66, 0.12);
+  padding: 2.25rem 2.4rem;
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 1.5rem;
+  flex-direction: column;
+  gap: 1.8rem;
 }
 
-.quote-header h1 {
-  font-size: 1.6rem;
+.screen__header h1,
+.screen__header h2 {
+  margin: 0;
   font-weight: 600;
-  color: #1c1c1c;
+  letter-spacing: 0.01em;
 }
 
-.quote-header p {
-  font-size: 1rem;
-  color: #6b6f79;
-}
-
-.table-wrapper {
-  border: 1px solid #cfcfcf;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
+.screen__header p {
+  margin: 0.35rem 0 0;
+  color: #5c6470;
   font-size: 0.95rem;
 }
 
-thead th {
-  background: #d9d9d9;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.78rem;
-  letter-spacing: 0.05em;
-  color: #2b2b2b;
-  padding: 0.9rem 1rem;
-  border-right: 1px solid #b8b8b8;
+.orientation-preview {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border: 1px solid #d7dce6;
+  border-radius: 8px;
+  background: #f5f7fb;
 }
 
-thead th:last-child {
-  border-right: none;
-  text-align: right;
+.orientation-visual {
+  width: 96px;
+  height: 72px;
+  border-radius: 6px;
+  border: 2px solid #4b67a1;
+  position: relative;
+  background: linear-gradient(90deg, rgba(75, 103, 161, 0.08), rgba(75, 103, 161, 0.18));
+  transition: transform 0.2s ease;
 }
 
-tbody tr {
-  background: #fefefe;
+.orientation-visual::after {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 52px;
+  border-radius: 4px;
+  background: #4b67a1;
+  top: 10px;
+  transition: left 0.2s ease;
 }
 
-tbody tr:nth-child(odd) {
-  background: #f9f7ef;
+.orientation-visual--left::after {
+  left: 8px;
 }
 
-td,
-th[scope="row"] {
-  border-top: 1px solid #d5d5d5;
-  border-right: 1px solid #d5d5d5;
-  padding: 0.85rem 1rem;
-  vertical-align: middle;
+.orientation-visual--centered::after {
+  left: calc(50% - 12px);
 }
 
-td:last-child {
-  border-right: none;
+.orientation-visual--right::after {
+  left: calc(100% - 32px);
 }
 
-tbody th[scope="row"] {
-  font-weight: 600;
-  color: #222;
-  text-align: left;
-}
-
-tbody td.option-cell {
-  background: #f8eac5;
-  color: #3a3122;
-}
-
-tbody td.price-cell {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
+.orientation-preview figcaption {
+  font-weight: 500;
   color: #1f2933;
 }
 
-.totals {
-  margin-top: 1.75rem;
-  border: 1px solid #d1cfc4;
-  background: #fdf6e3;
-  border-radius: 4px;
-  padding: 1rem 1.25rem;
+.options-form {
   display: grid;
-  gap: 0.65rem;
+  gap: 1.25rem;
+}
+
+.form-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.form-field label {
+  font-weight: 600;
+  color: #1b2430;
+}
+
+.form-field select {
+  appearance: none;
+  background: #f4f6fb url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8"%3E%3Cpath fill="%233a4a72" d="M6 8 0 0h12z"/%3E%3C/svg%3E') no-repeat right 0.85rem center;
+  background-size: 12px 8px;
+  border-radius: 6px;
+  border: 1px solid #c5ccdd;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  font-size: 1rem;
+  color: #1f2933;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-field select:focus {
+  outline: none;
+  border-color: #4b67a1;
+  box-shadow: 0 0 0 3px rgba(75, 103, 161, 0.2);
+}
+
+.form-field__help {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #627089;
+}
+
+.form-field__error {
+  margin: 0;
+  font-size: 0.83rem;
+  color: #b42318;
+  display: none;
+}
+
+.form-field[data-error="true"] .form-field__error {
+  display: block;
+}
+
+.form-field[data-error="true"] select {
+  border-color: #b42318;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.form-actions button {
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #f6c976, #f2a65a);
+  color: #3a2f18;
+  font-weight: 600;
+  padding: 0.8rem 1.4rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-actions button:hover,
+.form-actions button:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(242, 166, 90, 0.35);
+}
+
+.price-per-qty,
+.options-breakdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  border: 1px solid #d8dde7;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.price-per-qty thead th,
+.options-breakdown thead th {
+  background: linear-gradient(180deg, #f1f4fb, #e2e7f4);
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.78rem;
+  color: #2f3b4c;
+}
+
+.price-per-qty tbody th,
+.price-per-qty tbody td,
+.options-breakdown tbody td {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid #e1e5f1;
+}
+
+.price-per-qty tbody th {
+  background: #fdf7eb;
+  font-weight: 600;
+  text-align: left;
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totals-card {
+  border: 1px solid #e3d9be;
+  border-radius: 8px;
+  background: #fdf5dd;
+  padding: 1.2rem 1.4rem;
+  display: grid;
+  gap: 0.75rem;
+  font-size: 1rem;
 }
 
 .totals-row {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  font-size: 1rem;
-}
-
-.totals-row strong {
-  font-weight: 600;
+  align-items: baseline;
   font-variant-numeric: tabular-nums;
 }
 
 .totals-row--total {
-  border-top: 1px solid #d2ceb6;
-  padding-top: 0.65rem;
-  margin-top: 0.4rem;
-  font-size: 1.05rem;
-}
-
-.actions {
-  margin-top: 2rem;
-  display: grid;
-  gap: 0.85rem;
-}
-
-.actions button {
-  background: #d7d7d7;
-  border: 1px solid #b7b7b7;
-  border-radius: 4px;
-  padding: 0.9rem 1rem;
-  font-size: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(125, 102, 52, 0.35);
+  font-size: 1.08rem;
   font-weight: 600;
-  text-transform: capitalize;
-  color: #2d2d2d;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.actions button:hover,
-.actions button:focus-visible {
-  background: #bebebe;
-  transform: translateY(-1px);
-}
-
-.margin-dialog {
-  border: 1px solid #b5b8c2;
-  border-radius: 6px;
-  padding: 1.5rem;
-  box-shadow: 0 18px 32px rgba(23, 26, 33, 0.22);
-}
-
-.margin-dialog form {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.margin-dialog h2 {
-  margin: 0;
-  font-size: 1.15rem;
-}
-
-.margin-dialog label {
-  font-size: 0.95rem;
-}
-
-.margin-dialog input[type="number"] {
-  padding: 0.5rem 0.6rem;
-  border-radius: 4px;
-  border: 1px solid #c5c5c5;
-  font-size: 1rem;
-}
-
-.margin-dialog menu {
+.options-breakdown__header {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.options-breakdown__header h3 {
   margin: 0;
-  padding: 0;
+  font-size: 1.1rem;
 }
 
-.margin-dialog button {
-  padding: 0.55rem 1.2rem;
-  border-radius: 4px;
-  border: 1px solid #b5b5b5;
-  background: #f5f5f5;
-  font-size: 0.95rem;
-  cursor: pointer;
+.options-breakdown__header p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #616a7d;
 }
 
-.margin-dialog button[value="confirm"] {
-  background: #5c83d6;
-  border-color: #4e70bd;
-  color: #ffffff;
+.options-breakdown tbody td:nth-child(2) {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
-.margin-dialog button:hover,
-.margin-dialog button:focus-visible {
-  filter: brightness(0.95);
+.options-breakdown tbody td:nth-child(3),
+.options-breakdown tbody td:nth-child(4) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 640px) {
-  .workspace {
-    padding: 1.5rem 1.25rem;
+.options-breakdown tbody tr.placeholder td {
+  text-align: center;
+  font-style: italic;
+  color: #7a8497;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    padding: 2.2rem 1.4rem;
   }
 
-  .quote-card {
-    padding: 1.5rem;
-  }
-
-  thead th,
-  td,
-  th[scope="row"] {
-    padding: 0.75rem;
-  }
-
-  .actions button {
-    font-size: 0.95rem;
+  .screen {
+    padding: 1.8rem;
   }
 }
