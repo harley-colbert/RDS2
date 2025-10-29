@@ -1,0 +1,6 @@
+Add LLM headers + mapping + chunking (no placeholders):
+- Models: headers, chunks.
+- LLM service: split at MAX_TOKENS_PER_PART (default 120000); call OpenRouter; request ONLY fenced JSON header list; store artifacts(kind='llm_headers_v1').
+- Map headers by exact title to last occurrence among lines excluding toc_spans_v1.
+- Persist headers with hierarchical path; build chunks (header line → line before next header), store token counts & text hash.
+- Endpoints: POST /api/documents/{id}/headers/llm, GET /api/documents/{id}/headers, POST /api/documents/{id}/chunk, GET /api/documents/{id}/chunks, GET /api/documents/{id}/chunks/{chunk_id}.

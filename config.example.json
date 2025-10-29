@@ -1,6 +1,0 @@
-{
-  "RDS_SALES_TOOL": "C:/path/to/RDS Sales Tool -hrc.xlsm",
-  "COSTING_WORKBOOK": "C:/path/to/Costing - hrc.xlsb",
-  "WORD_TEMPLATE": "C:/path/to/templates/Quote.docx",
-  "OUTPUT_DIR": "C:/path/to/output"
-}

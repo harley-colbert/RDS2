@@ -1,0 +1,9 @@
+Create the project scaffold with working code (no placeholders):
+- Python only; no Node/npm/CDNs.
+- Backend FastAPI on port 5581 with GET /api/health.
+- Frontend static server on port 5580 serving /app/frontend.
+- Orchestrator run.py launches both, handles Ctrl-C, reads .env.
+- CORS allow http://localhost:5580 and http://127.0.0.1:5580.
+- Files: /app/backend/main.py, /app/backend/core/{config.py,db.py}, /app/frontend/{index.html, assets/app.css, app.js, views/, vm/, lib/}, /run.py, /requirements.txt, /.env.example, /README.md.
+- requirements: fastapi, uvicorn, sqlalchemy, python-dotenv, python-multipart, starlette.
+Ensure `python run.py` works with no TODOs.

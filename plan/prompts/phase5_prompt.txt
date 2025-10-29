@@ -1,0 +1,7 @@
+Add spec rules, caching, tests (no placeholders):
+- services/spec_rules.py with deterministic regex/state logic;
+- Model: extractions(versioned, result_json, cost_tokens);
+- Endpoints: POST /api/documents/{id}/extract/specs, GET /api/documents/{id}/status, GET /api/version;
+- Cache keys: sha256 + rules_version;
+- Pytest for parsing, TOC exclusion, header mapping, chunking, spec rules;
+- Error envelopes + trace_id logs.

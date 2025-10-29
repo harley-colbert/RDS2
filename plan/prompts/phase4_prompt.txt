@@ -1,0 +1,4 @@
+Build the pure-ESM thin-VM frontend (no placeholders):
+- index.html + assets/app.css + app.js router.
+- Views & VMs: Documents (list/upload/select), Headers (tree/select), Chunk (render text/meta), Search (backend /search).
+- No frameworks, no CDNs; local assets only; simple DOM updates.

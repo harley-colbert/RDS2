@@ -1,0 +1,5 @@
+Implement persistence and PDF parsing (no placeholders):
+- SQLAlchemy models: documents, pages, lines, artifacts; auto-create tables.
+- POST /api/documents/upload (multipart): store file /data/docs/{sha256}/{filename}; compute sha256; de-dupe; parse pages/lines with bbox & blank lines; detect TOC/Index; store artifacts(kind='toc_spans_v1').
+- GET /api/documents, GET /api/documents/{id}, GET /api/documents/{id}/lines?limit&offset.
+- Structured logs with request IDs.
