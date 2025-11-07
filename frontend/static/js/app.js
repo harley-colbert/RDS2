@@ -69,6 +69,7 @@ const costGridEls = {
   banner: document.getElementById('cost-grid-path-banner'),
   pathForm: document.getElementById('cost-grid-path-form'),
   pathInput: document.getElementById('cost-grid-path-input'),
+  browseButton: document.getElementById('cost-grid-browse-button'),
   status: document.getElementById('cost-grid-status'),
   tableBody: document.getElementById('cost-grid-table-body'),
   metaPath: document.getElementById('cost-grid-meta-path'),
@@ -81,6 +82,28 @@ const costGridState = {
   lastMeta: null,
   marginButtonLabel: costGridEls.marginButton ? costGridEls.marginButton.textContent : 'Apply Margin',
 };
+
+const costGridBrowserEls = {
+  overlay: document.getElementById('cost-grid-browser'),
+  dialog: document.getElementById('cost-grid-browser-dialog'),
+  closeControls: Array.from(document.querySelectorAll('[data-cost-grid-browser-close]')),
+  cwd: document.getElementById('cost-grid-browser-cwd'),
+  rootsSection: document.getElementById('cost-grid-browser-roots-section'),
+  roots: document.getElementById('cost-grid-browser-roots'),
+  entries: document.getElementById('cost-grid-browser-entries'),
+  error: document.getElementById('cost-grid-browser-error'),
+  loading: document.getElementById('cost-grid-browser-loading'),
+  reset: document.getElementById('cost-grid-browser-reset'),
+  up: document.getElementById('cost-grid-browser-up'),
+};
+
+const costGridBrowserState = {
+  parent: null,
+  cwd: '',
+};
+
+let costGridBrowserRestoreFocus = null;
+let costGridBrowserRequestId = 0;
 
 function announce(message) {
   if (!liveRegion) return;
@@ -518,6 +541,244 @@ function clearCostGridTable() {
     '<tr class="placeholder"><td colspan="5">No data loaded.</td></tr>';
 }
 
+function setCostGridBrowserError(message) {
+  if (!costGridBrowserEls.error) return;
+  if (message) {
+    costGridBrowserEls.error.hidden = false;
+    costGridBrowserEls.error.textContent = message;
+  } else {
+    costGridBrowserEls.error.hidden = true;
+    costGridBrowserEls.error.textContent = '';
+  }
+}
+
+function setCostGridBrowserLoading(isLoading) {
+  if (costGridBrowserEls.loading) {
+    costGridBrowserEls.loading.hidden = !isLoading;
+  }
+  if (costGridBrowserEls.reset) {
+    costGridBrowserEls.reset.disabled = isLoading;
+  }
+  if (costGridBrowserEls.roots) {
+    costGridBrowserEls.roots.classList.toggle('is-loading', Boolean(isLoading));
+  }
+  if (costGridBrowserEls.entries) {
+    costGridBrowserEls.entries.classList.toggle('is-loading', Boolean(isLoading));
+  }
+  if (costGridBrowserEls.up) {
+    const disabled = isLoading || !costGridBrowserState.parent;
+    costGridBrowserEls.up.disabled = Boolean(disabled);
+  }
+}
+
+function renderCostGridBrowserRoots(roots) {
+  if (!costGridBrowserEls.roots || !costGridBrowserEls.rootsSection) return;
+  costGridBrowserEls.roots.innerHTML = '';
+  const list = Array.isArray(roots) ? roots : [];
+  if (!list.length) {
+    costGridBrowserEls.rootsSection.hidden = true;
+    return;
+  }
+  costGridBrowserEls.rootsSection.hidden = false;
+  list.forEach((root) => {
+    const path = root?.path ? String(root.path) : '';
+    const label = root?.name ? String(root.name) : path;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'cost-grid-browser__root-button';
+    button.textContent = label;
+    button.setAttribute('data-path', path);
+    costGridBrowserEls.roots.appendChild(button);
+  });
+}
+
+function renderCostGridBrowserEntries(entries) {
+  if (!costGridBrowserEls.entries) return;
+  costGridBrowserEls.entries.innerHTML = '';
+  const list = Array.isArray(entries) ? entries : [];
+  if (!list.length) {
+    const empty = document.createElement('div');
+    empty.className = 'cost-grid-browser__empty';
+    empty.textContent = 'No items in this folder.';
+    costGridBrowserEls.entries.appendChild(empty);
+    return;
+  }
+
+  list.forEach((entry) => {
+    const row = document.createElement('div');
+    row.className = 'cost-grid-browser__row';
+
+    const itemButton = document.createElement('button');
+    itemButton.type = 'button';
+    itemButton.className = 'cost-grid-browser__item';
+    const path = entry?.path ? String(entry.path) : '';
+    const isDir = Boolean(entry?.isDir);
+    const isExcel = Boolean(entry?.isExcel);
+    itemButton.setAttribute('data-path', path);
+    itemButton.setAttribute('data-action', isDir ? 'enter' : 'select');
+    itemButton.setAttribute('data-is-dir', isDir ? '1' : '0');
+    itemButton.setAttribute('data-is-excel', isExcel ? '1' : '0');
+
+    const icon = document.createElement('span');
+    icon.className = 'cost-grid-browser__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = isDir ? '📁' : isExcel ? '📄' : '📃';
+
+    const label = document.createElement('span');
+    label.className = 'cost-grid-browser__label';
+    label.textContent = entry?.name ? String(entry.name) : path;
+
+    itemButton.appendChild(icon);
+    itemButton.appendChild(label);
+    row.appendChild(itemButton);
+
+    if (entry?.isFile) {
+      const selectButton = document.createElement('button');
+      selectButton.type = 'button';
+      selectButton.className = 'cost-grid-browser__select';
+      selectButton.textContent = 'Select';
+      selectButton.setAttribute('data-path', path);
+      selectButton.setAttribute('data-action', 'select');
+      selectButton.setAttribute('data-is-dir', isDir ? '1' : '0');
+      selectButton.setAttribute('data-is-excel', isExcel ? '1' : '0');
+      if (!isExcel) {
+        selectButton.disabled = true;
+      }
+      row.appendChild(selectButton);
+    }
+
+    costGridBrowserEls.entries.appendChild(row);
+  });
+}
+
+function renderCostGridBrowser(payload) {
+  costGridBrowserState.parent = payload?.parent ? String(payload.parent) : null;
+  costGridBrowserState.cwd = payload?.cwd ? String(payload.cwd) : '';
+  if (costGridBrowserEls.cwd) {
+    const cwdText = costGridBrowserState.cwd || 'Drives';
+    costGridBrowserEls.cwd.textContent = cwdText;
+  }
+  renderCostGridBrowserRoots(payload?.roots);
+  renderCostGridBrowserEntries(payload?.entries);
+  if (costGridBrowserEls.up) {
+    costGridBrowserEls.up.disabled = !costGridBrowserState.parent;
+  }
+}
+
+async function loadCostGridBrowser(targetPath) {
+  if (!costGridBrowserEls.overlay) return;
+  const requestId = ++costGridBrowserRequestId;
+  setCostGridBrowserLoading(true);
+  setCostGridBrowserError('');
+  try {
+    const query = targetPath ? `?path=${encodeURIComponent(targetPath)}` : '';
+    const response = await fetch(`/api/cost-sheet/browse${query}`);
+    const payload = await response.json().catch(() => ({}));
+    if (requestId !== costGridBrowserRequestId) {
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(payload?.detail || `HTTP ${response.status}`);
+    }
+    renderCostGridBrowser(payload || {});
+    setCostGridBrowserError('');
+  } catch (error) {
+    if (requestId !== costGridBrowserRequestId) {
+      return;
+    }
+    const message = error && error.message ? error.message : 'Failed to browse directories.';
+    setCostGridBrowserError(message);
+  } finally {
+    if (requestId === costGridBrowserRequestId) {
+      setCostGridBrowserLoading(false);
+    }
+  }
+}
+
+function handleCostGridBrowserKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeCostGridBrowser();
+  }
+}
+
+function openCostGridBrowser(initialPath) {
+  if (!costGridBrowserEls.overlay) return;
+  costGridBrowserRestoreFocus = document.activeElement;
+  costGridBrowserEls.overlay.hidden = false;
+  document.body.classList.add('modal-open');
+  setCostGridBrowserError('');
+  costGridBrowserState.parent = null;
+  costGridBrowserState.cwd = '';
+  if (costGridBrowserEls.up) {
+    costGridBrowserEls.up.disabled = true;
+  }
+  if (costGridBrowserEls.dialog) {
+    costGridBrowserEls.dialog.focus();
+  }
+  document.addEventListener('keydown', handleCostGridBrowserKeydown, true);
+  const target = initialPath && typeof initialPath === 'string' && initialPath.trim() ? initialPath.trim() : '';
+  loadCostGridBrowser(target);
+}
+
+function closeCostGridBrowser() {
+  if (!costGridBrowserEls.overlay) return;
+  costGridBrowserEls.overlay.hidden = true;
+  document.body.classList.remove('modal-open');
+  document.removeEventListener('keydown', handleCostGridBrowserKeydown, true);
+  setCostGridBrowserError('');
+  setCostGridBrowserLoading(false);
+  costGridBrowserRequestId += 1;
+  if (costGridBrowserRestoreFocus && typeof costGridBrowserRestoreFocus.focus === 'function') {
+    costGridBrowserRestoreFocus.focus();
+  }
+  costGridBrowserRestoreFocus = null;
+}
+
+function selectCostGridBrowserPath(path) {
+  if (!path || !costGridEls.pathInput) {
+    closeCostGridBrowser();
+    return;
+  }
+  costGridEls.pathInput.value = path;
+  costGridEls.pathInput.dispatchEvent(new Event('input', { bubbles: true }));
+  costGridBrowserRestoreFocus = costGridEls.pathInput;
+  closeCostGridBrowser();
+  setCostGridStatus('Workbook path selected. Save the path to load the Summary grid.', 'info');
+}
+
+function handleCostGridBrowserRootClick(event) {
+  const button = event.target.closest('button[data-path]');
+  if (!button) return;
+  event.preventDefault();
+  const path = button.getAttribute('data-path');
+  if (path) {
+    loadCostGridBrowser(path);
+  }
+}
+
+function handleCostGridBrowserEntryClick(event) {
+  const button = event.target.closest('button[data-path]');
+  if (!button) return;
+  event.preventDefault();
+  const path = button.getAttribute('data-path');
+  if (!path) {
+    return;
+  }
+  const isDir = button.getAttribute('data-is-dir') === '1';
+  const isExcel = button.getAttribute('data-is-excel') === '1';
+  const action = button.getAttribute('data-action');
+  if (isDir && action === 'enter') {
+    loadCostGridBrowser(path);
+    return;
+  }
+  if (!isExcel) {
+    setCostGridBrowserError('Select an Excel workbook (.xlsm, .xlsb, .xlsx, .xls).');
+    return;
+  }
+  selectCostGridBrowserPath(path);
+}
+
 function renderCostGridTable(rows) {
   if (!costGridEls.tableBody) return;
   if (!Array.isArray(rows) || !rows.length) {
@@ -711,8 +972,39 @@ function initCostGridPanel() {
   if (costGridEls.pathForm) {
     costGridEls.pathForm.addEventListener('submit', submitCostGridPath);
   }
+  if (costGridEls.browseButton) {
+    costGridEls.browseButton.addEventListener('click', () => {
+      const initial = costGridEls.pathInput && costGridEls.pathInput.value ? costGridEls.pathInput.value.trim() : '';
+      openCostGridBrowser(initial);
+    });
+  }
   if (costGridEls.marginForm) {
     costGridEls.marginForm.addEventListener('submit', submitCostGridMargin);
+  }
+  if (costGridBrowserEls.reset) {
+    costGridBrowserEls.reset.addEventListener('click', () => {
+      loadCostGridBrowser('');
+    });
+  }
+  if (costGridBrowserEls.up) {
+    costGridBrowserEls.up.addEventListener('click', () => {
+      if (costGridBrowserState.parent) {
+        loadCostGridBrowser(costGridBrowserState.parent);
+      }
+    });
+  }
+  if (costGridBrowserEls.roots) {
+    costGridBrowserEls.roots.addEventListener('click', handleCostGridBrowserRootClick);
+  }
+  if (costGridBrowserEls.entries) {
+    costGridBrowserEls.entries.addEventListener('click', handleCostGridBrowserEntryClick);
+  }
+  if (Array.isArray(costGridBrowserEls.closeControls)) {
+    costGridBrowserEls.closeControls.forEach((el) => {
+      if (el && typeof el.addEventListener === 'function') {
+        el.addEventListener('click', closeCostGridBrowser);
+      }
+    });
   }
   document.addEventListener('cost-grid:refresh', () => {
     fetchCostGridSummary();

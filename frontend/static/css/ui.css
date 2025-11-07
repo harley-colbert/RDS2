@@ -323,23 +323,33 @@ body {
   gap: 0.5rem;
 }
 
-.excel-open-form__actions button {
-  border: none;
+.excel-open-form__button {
   border-radius: 6px;
-  background: linear-gradient(135deg, #4b67a1, #2f3f67);
-  color: #ffffff;
   font-weight: 600;
   padding: 0.65rem 1.2rem;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.excel-open-form__actions button:nth-child(2) {
-  background: linear-gradient(135deg, #7786b6, #4b67a1);
+.excel-open-form__button--primary {
+  border: none;
+  background: linear-gradient(135deg, #4b67a1, #2f3f67);
+  color: #ffffff;
 }
 
-.excel-open-form__actions button:hover,
-.excel-open-form__actions button:focus-visible {
+.excel-open-form__button--secondary {
+  border: 1px solid #c5ccdd;
+  background: #eef1fb;
+  color: #2f3f67;
+}
+
+.excel-open-form__button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.excel-open-form__button:hover,
+.excel-open-form__button:focus-visible {
   transform: translateY(-1px);
   box-shadow: 0 8px 16px rgba(47, 63, 103, 0.3);
 }
@@ -433,6 +443,245 @@ body {
 
 .excel-panel__status[data-status='info'] {
   color: #2f3f67;
+}
+
+.cost-grid-browser {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 40;
+}
+
+.cost-grid-browser[hidden] {
+  display: none;
+}
+
+.cost-grid-browser__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.55);
+}
+
+.cost-grid-browser__dialog {
+  position: relative;
+  width: min(92vw, 640px);
+  max-height: 80vh;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cost-grid-browser__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #d7deef;
+}
+
+.cost-grid-browser__header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1b2430;
+}
+
+.cost-grid-browser__close {
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #4b5563;
+}
+
+.cost-grid-browser__body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cost-grid-browser__path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: #1b2430;
+}
+
+.cost-grid-browser__path-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cost-grid-browser__path-actions button {
+  border: 1px solid #c5ccdd;
+  border-radius: 6px;
+  background: #eef1fb;
+  color: #2f3f67;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+}
+
+.cost-grid-browser__path-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cost-grid-browser__error {
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  background: #fee4e2;
+  border: 1px solid #fda29b;
+  color: #b42318;
+  font-size: 0.85rem;
+}
+
+.cost-grid-browser__loading {
+  font-size: 0.9rem;
+  color: #4b67a1;
+}
+
+.cost-grid-browser__section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4b5563;
+}
+
+.cost-grid-browser__contents-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.cost-grid-browser__roots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.cost-grid-browser__root-button {
+  border: 1px solid #d7deef;
+  border-radius: 6px;
+  background: #f5f7fb;
+  color: #1b2430;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cost-grid-browser__entries {
+  border: 1px solid #d7deef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cost-grid-browser__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e3e8f4;
+  background: #ffffff;
+  font-size: 0.95rem;
+}
+
+.cost-grid-browser__row:last-child {
+  border-bottom: none;
+}
+
+.cost-grid-browser__item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: #1b2430;
+}
+
+.cost-grid-browser__item:hover,
+.cost-grid-browser__item:focus-visible {
+  text-decoration: underline;
+}
+
+.cost-grid-browser__icon {
+  font-size: 1.1rem;
+}
+
+.cost-grid-browser__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cost-grid-browser__select {
+  border: 1px solid #c5ccdd;
+  border-radius: 6px;
+  background: #f5f7fb;
+  color: #2f3f67;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+
+.cost-grid-browser__select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cost-grid-browser__empty {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.cost-grid-browser__roots.is-loading,
+.cost-grid-browser__entries.is-loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.cost-grid-browser__footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #d7deef;
+  background: #f9fafe;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cost-grid-browser__cancel {
+  border: none;
+  background: none;
+  color: #4b67a1;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+body.modal-open {
+  overflow: hidden;
 }
 
 .excel-table-wrap {
