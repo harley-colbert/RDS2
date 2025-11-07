@@ -176,6 +176,34 @@
           </table>
         </div>
       </section>
+
+      <section class="screen screen--settings" aria-labelledby="settings-title">
+        <header class="screen__header">
+          <h2 id="settings-title">App Settings</h2>
+          <p>Set or upload the Cost Grid workbook used for pricing.</p>
+        </header>
+
+        <div class="card">
+          <label for="cost-grid-path">Cost Grid path (local file system)</label>
+          <div class="row">
+            <input
+              id="cost-grid-path"
+              type="text"
+              placeholder="C:\\path\\to\\Costing.xlsb"
+              autocomplete="off"
+            />
+            <button id="btn-test-cost-grid" type="button">Test</button>
+            <button id="btn-save-cost-grid" type="button">Save</button>
+          </div>
+
+          <div class="row" style="margin-top: 0.5rem">
+            <input id="cost-grid-file" type="file" accept=".xls,.xlsx,.xlsb" />
+            <button id="btn-upload-cost-grid" type="button">Upload &amp; Use</button>
+          </div>
+
+          <p id="app-settings-cost-grid-status" role="status" aria-live="polite"></p>
+        </div>
+      </section>
     </main>
 
     <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>

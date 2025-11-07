@@ -11,6 +11,7 @@ def create_app(config_path: str | None = None) -> Flask:
     from .config import load_config
     from .database import init_db
     from .api import register_api
+    from ..routes.settings import settings_bp
     """Application factory used by tests and runtime."""
     config = load_config(config_path)
     # The frontend is served by a blueprint that lives outside of the Flask
@@ -28,6 +29,7 @@ def create_app(config_path: str | None = None) -> Flask:
 
     init_db(app)
     register_api(app)
+    app.register_blueprint(settings_bp)
 
     @app.get("/health")
     def health() -> dict[str, str]:

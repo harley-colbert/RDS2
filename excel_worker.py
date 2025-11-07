@@ -4,7 +4,9 @@ import time
 import math
 import logging
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
+
+from backend.services.app_settings import AppSettings
 
 try:
     import xlwings as xw
@@ -16,6 +18,19 @@ except Exception as e:
 
 
 logger = logging.getLogger("ExcelWorker")
+
+
+_APP_SETTINGS = AppSettings()
+
+
+def get_configured_cost_grid_path() -> Path:
+    raw_path = _APP_SETTINGS.get("cost_grid_path")
+    if not raw_path:
+        raise RuntimeError(
+            "Cost grid path is not configured. "
+            "Open the app, go to App Settings, and set or upload the cost grid workbook."
+        )
+    return Path(raw_path)
 
 
 def to_number(val):
@@ -118,14 +133,15 @@ class ExcelSessionWorker:
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
-    def open_workbook_async(self, path: Path):
+    def open_workbook_async(self, path: Optional[Path] = None):
         """
         Ask the worker to open this workbook read/write in the background.
         Returns immediately; use is_ready() to see when it is ready.
         """
-        self._path = path
+        target_path = path or get_configured_cost_grid_path()
+        self._path = target_path
         self._ready_event.clear()
-        self._cmd_q.put({"type": "open", "path": path})
+        self._cmd_q.put({"type": "open", "path": target_path})
 
     def is_ready(self) -> bool:
         """True if the workbook is open and ready for commands."""
