@@ -34,7 +34,6 @@ def _summary_response(rows: list[dict[str, Any]], path: Path) -> Dict[str, Any]:
     }
 
 
-@router.api_route("/connect", methods=["GET", "POST"])
 def connect_cost_grid() -> Dict[str, Any]:
     """Ensure the stored cost sheet is connected via xlwings before use."""
 
@@ -67,6 +66,20 @@ def connect_cost_grid() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail="Failed to connect to cost grid.")
 
     return {"ok": True, "path": str(path)}
+
+
+@router.post("/connect")
+def post_connect_cost_grid() -> Dict[str, Any]:
+    """POST handler that ensures Excel is connected before other calls."""
+
+    return connect_cost_grid()
+
+
+@router.get("/connect")
+def get_connect_cost_grid() -> Dict[str, Any]:
+    """GET handler that ensures Excel is connected before other calls."""
+
+    return connect_cost_grid()
 
 
 @router.get("/summary")

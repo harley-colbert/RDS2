@@ -58,12 +58,24 @@ def test_connect_handles_missing_workbook(tmp_path: Path, monkeypatch) -> None:
     assert payload["error"] == "COST_SHEET_PATH_MISSING"
 
 
-def test_connect_route_allows_get_requests() -> None:
+def _route_methods(path: str) -> set[str]:
+    methods: set[str] = set()
     for route in panel3_cost.router.routes:
-        if getattr(route, "path", None) == "/api/panel3/connect":
-            methods = {method.upper() for method in getattr(route, "methods", set())}
-            assert "GET" in methods
-            assert "POST" in methods
-            break
-    else:  # pragma: no cover - defensive
-        pytest.fail("/api/panel3/connect route is not registered")
+        if getattr(route, "path", None) == path:
+            methods.update(method.upper() for method in getattr(route, "methods", set()))
+    return methods
+
+
+def test_panel3_routes_allow_expected_methods() -> None:
+    connect_methods = _route_methods("/api/panel3/connect")
+    summary_methods = _route_methods("/api/panel3/summary")
+    margin_methods = _route_methods("/api/panel3/margin")
+    path_methods = _route_methods("/api/panel3/path")
+
+    if not connect_methods or not summary_methods or not margin_methods or not path_methods:
+        pytest.fail("One or more panel3 routes were not registered")
+
+    assert {"GET", "POST"} <= connect_methods
+    assert {"GET"} <= summary_methods
+    assert {"POST"} <= margin_methods
+    assert {"POST"} <= path_methods
