@@ -56,3 +56,14 @@ def test_connect_handles_missing_workbook(tmp_path: Path, monkeypatch) -> None:
     assert response.status_code == 400
     payload = json.loads(response.body.decode())
     assert payload["error"] == "COST_SHEET_PATH_MISSING"
+
+
+def test_connect_route_allows_get_requests() -> None:
+    for route in panel3_cost.router.routes:
+        if getattr(route, "path", None) == "/api/panel3/connect":
+            methods = {method.upper() for method in getattr(route, "methods", set())}
+            assert "GET" in methods
+            assert "POST" in methods
+            break
+    else:  # pragma: no cover - defensive
+        pytest.fail("/api/panel3/connect route is not registered")

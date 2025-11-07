@@ -34,7 +34,7 @@ def _summary_response(rows: list[dict[str, Any]], path: Path) -> Dict[str, Any]:
     }
 
 
-@router.post("/connect")
+@router.api_route("/connect", methods=["GET", "POST"])
 def connect_cost_grid() -> Dict[str, Any]:
     """Ensure the stored cost sheet is connected via xlwings before use."""
 
