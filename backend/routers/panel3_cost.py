@@ -34,6 +34,41 @@ def _summary_response(rows: list[dict[str, Any]], path: Path) -> Dict[str, Any]:
     }
 
 
+@router.post("/connect")
+def connect_cost_grid() -> Dict[str, Any]:
+    """Ensure the stored cost sheet is connected via xlwings before use."""
+
+    path = settings_db.get_cost_sheet_path()
+    if path is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": "COST_SHEET_PATH_MISSING"},
+        )
+
+    try:
+        cost_grid.set_cost_sheet_path(path)
+    except FileNotFoundError:
+        logger.warning("Stored cost sheet path is missing on disk: %s", path)
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": "COST_SHEET_PATH_MISSING"},
+        )
+    except cost_grid.ExcelUnavailable as exc:
+        logger.error("Excel is unavailable: %s", exc)
+        raise HTTPException(status_code=500, detail="Excel is not available on this server.")
+    except ValueError as exc:
+        logger.error("Invalid cost sheet path configured: %s", exc)
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": "COST_SHEET_PATH_MISSING"},
+        )
+    except Exception as exc:  # pragma: no cover - Excel runtime errors
+        logger.exception("Failed to connect cost grid: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to connect to cost grid.")
+
+    return {"ok": True, "path": str(path)}
+
+
 @router.get("/summary")
 def get_summary() -> Dict[str, Any]:
     path = settings_db.get_cost_sheet_path()

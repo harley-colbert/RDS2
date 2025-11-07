@@ -81,6 +81,8 @@ const costGridEls = {
 const costGridState = {
   lastMeta: null,
   marginButtonLabel: costGridEls.marginButton ? costGridEls.marginButton.textContent : 'Apply Margin',
+  isConnected: false,
+  connectPromise: null,
 };
 
 const costGridBrowserEls = {
@@ -827,14 +829,61 @@ function updateCostGridMeta(meta) {
 }
 
 function handleMissingCostGridPath() {
+  costGridState.isConnected = false;
+  costGridState.connectPromise = null;
   showCostGridBanner(true);
   setCostGridControlsEnabled(false);
   updateCostGridMeta({});
   clearCostGridTable();
 }
 
+async function ensureCostGridConnected({ quiet = false } = {}) {
+  if (costGridState.isConnected) {
+    return true;
+  }
+
+  if (costGridState.connectPromise) {
+    return costGridState.connectPromise;
+  }
+
+  const pending = (async () => {
+    try {
+      const response = await fetch('/api/panel3/connect', { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 400 && payload?.error === 'COST_SHEET_PATH_MISSING') {
+        handleMissingCostGridPath();
+        if (!quiet) {
+          setCostGridStatus('Set the cost sheet path to connect to Excel.', 'info');
+        }
+        return false;
+      }
+      if (!response.ok) {
+        throw new Error(payload?.detail || `HTTP ${response.status}`);
+      }
+      costGridState.isConnected = true;
+      return true;
+    } catch (error) {
+      costGridState.isConnected = false;
+      const message = error && error.message ? error.message : 'Failed to connect to Excel.';
+      if (!quiet) {
+        setCostGridStatus(message, 'error');
+      }
+      return false;
+    } finally {
+      costGridState.connectPromise = null;
+    }
+  })();
+
+  costGridState.connectPromise = pending;
+  return pending;
+}
+
 async function fetchCostGridSummary({ quiet = false } = {}) {
   if (!costGridEls.tableBody) return;
+  const connected = await ensureCostGridConnected({ quiet });
+  if (!connected) {
+    return;
+  }
   if (!quiet) {
     setCostGridStatus('Loading Summary…', 'info');
   }
@@ -894,6 +943,8 @@ async function submitCostGridPath(event) {
     if (!response.ok) {
       throw new Error(payload?.detail || `HTTP ${response.status}`);
     }
+    costGridState.isConnected = false;
+    costGridState.connectPromise = null;
     await fetchCostGridSummary();
   } catch (error) {
     const message = error && error.message ? error.message : 'Failed to save cost sheet path.';
@@ -917,6 +968,11 @@ async function submitCostGridMargin(event) {
   if (!marginText) {
     setCostGridStatus('Enter a margin value to apply.', 'error');
     costGridEls.marginInput.focus();
+    return;
+  }
+
+  const connected = await ensureCostGridConnected({ quiet: false });
+  if (!connected) {
     return;
   }
 
