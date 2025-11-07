@@ -102,6 +102,45 @@
           </table>
         </section>
       </section>
+
+      <section class="screen screen--excel" aria-labelledby="excel-summary-title">
+        <header class="screen__header">
+          <h2 id="excel-summary-title">Excel Summary (C4:K55)</h2>
+          <p>Displays the live grid from Summary!C4:K55 of the configured cost workbook.</p>
+        </header>
+
+        <form id="excel-open-form" class="excel-open-form" novalidate>
+          <label class="sr-only" for="excel-path">Cost sheet path</label>
+          <input
+            id="excel-path"
+            type="text"
+            name="path"
+            autocomplete="off"
+            placeholder="C:\\path\\to\\Costing.xlsb"
+          />
+          <div class="excel-open-form__actions">
+            <button type="submit">Open</button>
+            <button type="button" id="excel-refresh">Refresh</button>
+          </div>
+        </form>
+
+        <div id="excel-status" class="excel-panel__status" aria-live="polite"></div>
+
+        <div class="excel-table-wrap" role="presentation">
+          <table
+            id="excel-summary-table"
+            class="excel-table"
+            aria-label="Summary!C4:K55 grid"
+            role="grid"
+          >
+            <tbody id="excel-summary-body">
+              <tr class="placeholder">
+                <td>No data loaded.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>

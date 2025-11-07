@@ -65,6 +65,13 @@ const totalsEls = {
   grand: document.getElementById('summary-grand'),
 };
 const optionsBreakdownBody = document.getElementById('options-breakdown-body');
+const excelEls = {
+  form: document.getElementById('excel-open-form'),
+  path: document.getElementById('excel-path'),
+  refresh: document.getElementById('excel-refresh'),
+  status: document.getElementById('excel-status'),
+  body: document.getElementById('excel-summary-body'),
+};
 
 function announce(message) {
   if (!liveRegion) return;
@@ -436,6 +443,114 @@ function resetToDefaults() {
   announce('System options reset to defaults.');
 }
 
+function setExcelStatus(message, type = 'info') {
+  if (!excelEls.status) return;
+  if (!message) {
+    excelEls.status.textContent = '';
+    delete excelEls.status.dataset.status;
+    return;
+  }
+  excelEls.status.textContent = message;
+  excelEls.status.dataset.status = type;
+}
+
+function clearExcelTable() {
+  if (!excelEls.body) return;
+  excelEls.body.innerHTML =
+    '<tr class="placeholder"><td>No data loaded.</td></tr>';
+}
+
+function renderExcelTable(values) {
+  if (!excelEls.body) return;
+  if (!Array.isArray(values) || !values.length) {
+    clearExcelTable();
+    return;
+  }
+  const rows = values
+    .map((row) => {
+      const cells = (Array.isArray(row) ? row : [row])
+        .map((cell) => {
+          const text = cell === null || cell === undefined ? '' : String(cell);
+          return `<td>${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`;
+        })
+        .join('');
+      return `<tr>${cells}</tr>`;
+    })
+    .join('');
+  excelEls.body.innerHTML = rows;
+}
+
+async function refreshExcelSummary() {
+  if (!excelEls.body) return;
+  setExcelStatus('Loading Summary…', 'info');
+  try {
+    const response = await fetch('/api/cost-sheet/summary');
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || `HTTP ${response.status}`);
+    }
+    renderExcelTable(payload.values || []);
+    const rows = Array.isArray(payload.values) ? payload.values.length : 0;
+    const sheet = payload.sheet || 'Summary';
+    const range = payload.range || 'C4:K55';
+    setExcelStatus(`Loaded ${rows} row${rows === 1 ? '' : 's'} from ${sheet}!${range}.`, 'success');
+  } catch (error) {
+    const message = error && error.message ? error.message : 'Failed to load Summary range.';
+    setExcelStatus(message, 'error');
+    clearExcelTable();
+  }
+}
+
+async function openExcelWorkbook(event) {
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
+  if (!excelEls.path) {
+    return;
+  }
+  const path = excelEls.path.value ? excelEls.path.value.trim() : '';
+  if (!path) {
+    setExcelStatus('Enter the full path to Costing.xlsb.', 'error');
+    return;
+  }
+  setExcelStatus('Opening workbook…', 'info');
+  try {
+    const response = await fetch('/api/cost-sheet/path', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || `HTTP ${response.status}`);
+    }
+    setExcelStatus('Workbook opened. Loading grid…', 'success');
+    await refreshExcelSummary();
+  } catch (error) {
+    const message = error && error.message ? error.message : 'Failed to open workbook.';
+    setExcelStatus(message, 'error');
+  }
+}
+
+function initExcelPanel() {
+  if (!excelEls.body) {
+    return;
+  }
+  if (excelEls.form) {
+    excelEls.form.addEventListener('submit', openExcelWorkbook);
+  }
+  if (excelEls.refresh) {
+    excelEls.refresh.addEventListener('click', (event) => {
+      if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
+      refreshExcelSummary();
+    });
+  }
+  clearExcelTable();
+  refreshExcelSummary();
+}
+
 async function init() {
   await loadCatalog();
   renderPricing(null);
@@ -446,4 +561,5 @@ if (resetButton) {
   resetButton.addEventListener('click', resetToDefaults);
 }
 
+initExcelPanel();
 init();
