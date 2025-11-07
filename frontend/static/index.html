@@ -8,7 +8,7 @@
     <script defer src="/static/js/app.js"></script>
   </head>
   <body>
-    <main class="app-shell" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+    <main class="app-shell">
       <section class="screen screen--options" aria-labelledby="system-options-title">
         <header class="screen__header">
           <h1 id="system-options-title">System Options</h1>
@@ -103,25 +103,40 @@
         </section>
       </section>
 
-      <!-- NEW: Third panel – live Excel Summary (C4:K55) -->
       <section class="screen screen--excel" aria-labelledby="excel-summary-title">
         <header class="screen__header">
           <h2 id="excel-summary-title">Excel Summary (C4:K55)</h2>
-          <p>Live read from the Summary sheet. Set workbook path then refresh.</p>
+          <p>Displays the live grid from Summary!C4:K55 of the configured cost workbook.</p>
         </header>
 
-        <form id="excel-open-form" class="excel-open-form" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-          <input id="excel-path" type="text" placeholder="C:\\path\\to\\Costing.xlsb" style="flex:1;padding:6px;" />
-          <button type="submit">Open</button>
-          <button type="button" id="excel-refresh">Refresh</button>
+        <form id="excel-open-form" class="excel-open-form" novalidate>
+          <label class="sr-only" for="excel-path">Cost sheet path</label>
+          <input
+            id="excel-path"
+            type="text"
+            name="path"
+            autocomplete="off"
+            placeholder="C:\\path\\to\\Costing.xlsb"
+          />
+          <div class="excel-open-form__actions">
+            <button type="submit">Open</button>
+            <button type="button" id="excel-refresh">Refresh</button>
+          </div>
         </form>
 
-        <div id="excel-error" class="error" aria-live="polite" style="color:#b00020;margin-bottom:8px;"></div>
+        <div id="excel-status" class="excel-panel__status" aria-live="polite"></div>
 
-        <div class="excel-grid-wrap" style="overflow:auto;max-height:calc(100vh - 280px);border:1px solid #ddd;border-radius:6px;">
-          <table id="excel-summary-table" class="excel-table" aria-label="Excel Summary range" role="grid" style="border-collapse:collapse;width:100%;font-size:12px;">
+        <div class="excel-table-wrap" role="presentation">
+          <table
+            id="excel-summary-table"
+            class="excel-table"
+            aria-label="Summary!C4:K55 grid"
+            role="grid"
+          >
             <tbody id="excel-summary-body">
-              <tr class="placeholder"><td style="padding:8px;color:#666;">No data loaded.</td></tr>
+              <tr class="placeholder">
+                <td>No data loaded.</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -129,83 +144,5 @@
     </main>
 
     <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>
-
-    <script>
-      // --- Third panel wiring (safe to run even if backend not ready) ---
-      (function() {
-        const form = document.getElementById('excel-open-form');
-        const pathInput = document.getElementById('excel-path');
-        const refreshBtn = document.getElementById('excel-refresh');
-        const err = document.getElementById('excel-error');
-        const tbody = document.getElementById('excel-summary-body');
-
-        function setError(msg) {
-          if (err) err.textContent = msg || '';
-        }
-
-        function clearTable() {
-          if (!tbody) return;
-          tbody.innerHTML = '<tr class="placeholder"><td style="padding:8px;color:#666;">No data loaded.</td></tr>';
-        }
-
-        function render(values) {
-          if (!tbody) return;
-          if (!Array.isArray(values) || !values.length) {
-            clearTable();
-            return;
-          }
-          const rows = values.map(row => {
-            const tds = (Array.isArray(row) ? row : [row]).map(cell => {
-              const text = (cell === null || cell === undefined) ? '' : String(cell);
-              return '<td style="border:1px solid #ddd;padding:4px;vertical-align:top;">' + text + '</td>';
-            }).join('');
-            return '<tr>' + tds + '</tr>';
-          }).join('');
-          tbody.innerHTML = rows;
-        }
-
-        async function openWorkbook(e) {
-          e && e.preventDefault();
-          setError('');
-          try {
-            const path = (pathInput && pathInput.value) || '';
-            if (!path) {
-              setError('Please enter the full path to Costing.xlsb');
-              return;
-            }
-            const res = await fetch('/api/cost-sheet/path', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ path })
-            });
-            const body = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(body.detail || ('HTTP ' + res.status));
-            // After opening, refresh the data
-            await refresh();
-          } catch (e) {
-            setError(e && e.message ? e.message : 'Failed to open workbook.');
-          }
-        }
-
-        async function refresh() {
-          setError('');
-          try {
-            const res = await fetch('/api/cost-sheet/summary');
-            const body = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(body.detail || ('HTTP ' + res.status));
-            render(body.values || []);
-          } catch (e) {
-            setError(e && e.message ? e.message : 'Failed to load summary.');
-            clearTable();
-          }
-        }
-
-        if (form) form.addEventListener('submit', openWorkbook);
-        if (refreshBtn) refreshBtn.addEventListener('click', refresh);
-
-        // Try an initial fetch so the panel displays if backend already configured
-        document.addEventListener('DOMContentLoaded', refresh);
-      })();
-    </script>
   </body>
 </html>
