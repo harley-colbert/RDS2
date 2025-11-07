@@ -1068,6 +1068,117 @@ function initCostGridPanel() {
   fetchCostGridSummary();
 }
 
+async function fetchJSON(url, opts = {}) {
+  const response = await fetch(url, opts);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data && data.error ? data.error : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return data;
+}
+
+function getSettingsStatusElement() {
+  return document.getElementById('app-settings-cost-grid-status');
+}
+
+async function loadCostGridSetting() {
+  const input = document.getElementById('cost-grid-path');
+  const status = getSettingsStatusElement();
+  if (!input || !status) {
+    return;
+  }
+  status.textContent = '';
+  try {
+    const data = await fetchJSON('/api/settings/cost-grid-path');
+    input.value = data.path || '';
+  } catch (error) {
+    status.textContent = `Unable to load saved path: ${error.message}`;
+  }
+}
+
+async function testCostGridPath() {
+  const input = document.getElementById('cost-grid-path');
+  const status = getSettingsStatusElement();
+  if (!input || !status) {
+    return;
+  }
+  status.textContent = 'Validating...';
+  try {
+    const data = await fetchJSON('/api/settings/cost-grid-path?dry_run=1', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: input.value }),
+    });
+    status.textContent = data.validated ? 'Path OK.' : 'Unknown validation result.';
+  } catch (error) {
+    status.textContent = `Invalid path: ${error.message}`;
+  }
+}
+
+async function saveCostGridPath() {
+  const input = document.getElementById('cost-grid-path');
+  const status = getSettingsStatusElement();
+  if (!input || !status) {
+    return;
+  }
+  status.textContent = 'Saving...';
+  try {
+    const data = await fetchJSON('/api/settings/cost-grid-path', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: input.value }),
+    });
+    status.textContent = `Saved: ${data.path}`;
+  } catch (error) {
+    status.textContent = `Save failed: ${error.message}`;
+  }
+}
+
+async function uploadCostGridFile() {
+  const fileInput = document.getElementById('cost-grid-file');
+  const status = getSettingsStatusElement();
+  if (!fileInput || !status) {
+    return;
+  }
+  if (!fileInput.files || fileInput.files.length === 0) {
+    status.textContent = 'Select a file first.';
+    return;
+  }
+  status.textContent = 'Uploading...';
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+  try {
+    const data = await fetchJSON('/api/settings/cost-grid-upload', {
+      method: 'POST',
+      body: form,
+    });
+    const input = document.getElementById('cost-grid-path');
+    if (input) {
+      input.value = data.path || '';
+    }
+    status.textContent = `Uploaded and saved: ${data.path}`;
+  } catch (error) {
+    status.textContent = `Upload failed: ${error.message}`;
+  }
+}
+
+function initSettingsUI() {
+  const testButton = document.getElementById('btn-test-cost-grid');
+  const saveButton = document.getElementById('btn-save-cost-grid');
+  const uploadButton = document.getElementById('btn-upload-cost-grid');
+  if (testButton) {
+    testButton.addEventListener('click', testCostGridPath);
+  }
+  if (saveButton) {
+    saveButton.addEventListener('click', saveCostGridPath);
+  }
+  if (uploadButton) {
+    uploadButton.addEventListener('click', uploadCostGridFile);
+  }
+  loadCostGridSetting();
+}
+
 async function init() {
   await loadCatalog();
   renderPricing(null);
@@ -1079,4 +1190,5 @@ if (resetButton) {
 }
 
 initCostGridPanel();
+initSettingsUI();
 init();
