@@ -124,7 +124,10 @@
               placeholder="C:\\path\\to\\Costing.xlsm"
             />
             <div class="excel-open-form__actions">
-              <button type="submit">Save Path</button>
+              <button type="button" id="cost-grid-browse-button" class="excel-open-form__button excel-open-form__button--secondary">
+                Browse…
+              </button>
+              <button type="submit" class="excel-open-form__button excel-open-form__button--primary">Save Path</button>
             </div>
           </form>
         </div>
@@ -176,5 +179,53 @@
     </main>
 
     <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>
+
+    <div id="cost-grid-browser" class="cost-grid-browser" hidden>
+      <div class="cost-grid-browser__backdrop" data-cost-grid-browser-close></div>
+      <div
+        id="cost-grid-browser-dialog"
+        class="cost-grid-browser__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cost-grid-browser-title"
+        tabindex="-1"
+      >
+        <header class="cost-grid-browser__header">
+          <h2 id="cost-grid-browser-title">Select Cost Sheet</h2>
+          <button
+            type="button"
+            class="cost-grid-browser__close"
+            data-cost-grid-browser-close
+            aria-label="Close browser"
+          >
+            ×
+          </button>
+        </header>
+        <div class="cost-grid-browser__body">
+          <div class="cost-grid-browser__path" aria-live="polite">
+            <span>Current folder: <strong id="cost-grid-browser-cwd">Drives</strong></span>
+            <div class="cost-grid-browser__path-actions">
+              <button type="button" id="cost-grid-browser-up">Up One Level</button>
+              <button type="button" id="cost-grid-browser-reset">Reset</button>
+            </div>
+          </div>
+          <div id="cost-grid-browser-error" class="cost-grid-browser__error" hidden></div>
+          <div id="cost-grid-browser-loading" class="cost-grid-browser__loading" hidden>Loading…</div>
+          <section id="cost-grid-browser-roots-section" class="cost-grid-browser__section" aria-label="Available drives" hidden>
+            <h3>Drives</h3>
+            <div id="cost-grid-browser-roots" class="cost-grid-browser__roots"></div>
+          </section>
+          <section class="cost-grid-browser__section" aria-label="Folder contents">
+            <div class="cost-grid-browser__contents-header">
+              <h3>Contents</h3>
+            </div>
+            <div id="cost-grid-browser-entries" class="cost-grid-browser__entries"></div>
+          </section>
+        </div>
+        <footer class="cost-grid-browser__footer">
+          <button type="button" class="cost-grid-browser__cancel" data-cost-grid-browser-close>Cancel</button>
+        </footer>
+      </div>
+    </div>
   </body>
 </html>
