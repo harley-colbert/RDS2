@@ -106,36 +106,68 @@
       <section class="screen screen--excel" aria-labelledby="excel-summary-title">
         <header class="screen__header">
           <h2 id="excel-summary-title">Excel Summary (C4:K55)</h2>
-          <p>Displays the live grid from Summary!C4:K55 of the configured cost workbook.</p>
+          <p>
+            Displays the live grid from Summary!C4:K55 and lets you apply a new margin using the
+            cost workbook.
+          </p>
         </header>
 
-        <form id="excel-open-form" class="excel-open-form" novalidate>
-          <label class="sr-only" for="excel-path">Cost sheet path</label>
-          <input
-            id="excel-path"
-            type="text"
-            name="path"
-            autocomplete="off"
-            placeholder="C:\\path\\to\\Costing.xlsb"
-          />
-          <div class="excel-open-form__actions">
-            <button type="submit">Open</button>
-            <button type="button" id="excel-refresh">Refresh</button>
-          </div>
-        </form>
+        <div id="cost-grid-path-banner" class="cost-grid-banner" hidden>
+          <p>Choose the Costing workbook to load the Summary table.</p>
+          <form id="cost-grid-path-form" class="excel-open-form" novalidate>
+            <label class="sr-only" for="cost-grid-path-input">Cost sheet path</label>
+            <input
+              id="cost-grid-path-input"
+              type="text"
+              name="path"
+              autocomplete="off"
+              placeholder="C:\\path\\to\\Costing.xlsm"
+            />
+            <div class="excel-open-form__actions">
+              <button type="submit">Save Path</button>
+            </div>
+          </form>
+        </div>
 
-        <div id="excel-status" class="excel-panel__status" aria-live="polite"></div>
+        <div class="cost-grid-controls">
+          <div class="cost-grid-meta" aria-live="polite">
+            <span id="cost-grid-meta-path"></span>
+            <span id="cost-grid-meta-updated"></span>
+          </div>
+          <form id="cost-grid-margin-form" class="cost-grid-margin-form" novalidate>
+            <label class="sr-only" for="cost-grid-margin-input">Margin</label>
+            <input
+              id="cost-grid-margin-input"
+              type="text"
+              name="margin"
+              autocomplete="off"
+              placeholder="12.5%"
+            />
+            <button id="cost-grid-margin-button" type="submit">Apply Margin</button>
+          </form>
+        </div>
+
+        <div id="cost-grid-status" class="excel-panel__status" aria-live="polite"></div>
 
         <div class="excel-table-wrap" role="presentation">
           <table
-            id="excel-summary-table"
+            id="cost-grid-table"
             class="excel-table"
-            aria-label="Summary!C4:K55 grid"
+            aria-label="Summary cost grid"
             role="grid"
           >
-            <tbody id="excel-summary-body">
+            <thead>
+              <tr>
+                <th scope="col">Description</th>
+                <th scope="col">Qty</th>
+                <th scope="col">Cost</th>
+                <th scope="col">Sell Price</th>
+                <th scope="col">Margin</th>
+              </tr>
+            </thead>
+            <tbody id="cost-grid-table-body">
               <tr class="placeholder">
-                <td>No data loaded.</td>
+                <td colspan="5">No data loaded.</td>
               </tr>
             </tbody>
           </table>

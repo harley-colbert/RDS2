@@ -65,12 +65,21 @@ const totalsEls = {
   grand: document.getElementById('summary-grand'),
 };
 const optionsBreakdownBody = document.getElementById('options-breakdown-body');
-const excelEls = {
-  form: document.getElementById('excel-open-form'),
-  path: document.getElementById('excel-path'),
-  refresh: document.getElementById('excel-refresh'),
-  status: document.getElementById('excel-status'),
-  body: document.getElementById('excel-summary-body'),
+const costGridEls = {
+  banner: document.getElementById('cost-grid-path-banner'),
+  pathForm: document.getElementById('cost-grid-path-form'),
+  pathInput: document.getElementById('cost-grid-path-input'),
+  status: document.getElementById('cost-grid-status'),
+  tableBody: document.getElementById('cost-grid-table-body'),
+  metaPath: document.getElementById('cost-grid-meta-path'),
+  metaUpdated: document.getElementById('cost-grid-meta-updated'),
+  marginForm: document.getElementById('cost-grid-margin-form'),
+  marginInput: document.getElementById('cost-grid-margin-input'),
+  marginButton: document.getElementById('cost-grid-margin-button'),
+};
+const costGridState = {
+  lastMeta: null,
+  marginButtonLabel: costGridEls.marginButton ? costGridEls.marginButton.textContent : 'Apply Margin',
 };
 
 function announce(message) {
@@ -443,112 +452,272 @@ function resetToDefaults() {
   announce('System options reset to defaults.');
 }
 
-function setExcelStatus(message, type = 'info') {
-  if (!excelEls.status) return;
+function escapeHtml(text) {
+  if (text === null || text === undefined) {
+    return '';
+  }
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatQuantity(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return '';
+  }
+  if (Math.abs(Math.round(numeric) - numeric) < 1e-6) {
+    return String(Math.round(numeric));
+  }
+  return numeric.toFixed(2);
+}
+
+function formatGridMargin(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return '';
+  }
+  return `${(numeric * 100).toFixed(1)}%`;
+}
+
+function setCostGridStatus(message, type = 'info') {
+  if (!costGridEls.status) return;
   if (!message) {
-    excelEls.status.textContent = '';
-    delete excelEls.status.dataset.status;
+    costGridEls.status.textContent = '';
+    delete costGridEls.status.dataset.status;
     return;
   }
-  excelEls.status.textContent = message;
-  excelEls.status.dataset.status = type;
+  costGridEls.status.textContent = message;
+  costGridEls.status.dataset.status = type;
 }
 
-function clearExcelTable() {
-  if (!excelEls.body) return;
-  excelEls.body.innerHTML =
-    '<tr class="placeholder"><td>No data loaded.</td></tr>';
+function showCostGridBanner(show) {
+  if (!costGridEls.banner) return;
+  costGridEls.banner.hidden = !show;
 }
 
-function renderExcelTable(values) {
-  if (!excelEls.body) return;
-  if (!Array.isArray(values) || !values.length) {
-    clearExcelTable();
+function setCostGridControlsEnabled(enabled) {
+  if (costGridEls.marginInput) {
+    costGridEls.marginInput.disabled = !enabled;
+  }
+  if (costGridEls.marginButton) {
+    costGridEls.marginButton.disabled = !enabled;
+  }
+}
+
+function clearCostGridTable() {
+  if (!costGridEls.tableBody) return;
+  costGridEls.tableBody.innerHTML =
+    '<tr class="placeholder"><td colspan="5">No data loaded.</td></tr>';
+}
+
+function renderCostGridTable(rows) {
+  if (!costGridEls.tableBody) return;
+  if (!Array.isArray(rows) || !rows.length) {
+    clearCostGridTable();
     return;
   }
-  const rows = values
+
+  const markup = rows
     .map((row) => {
-      const cells = (Array.isArray(row) ? row : [row])
-        .map((cell) => {
-          const text = cell === null || cell === undefined ? '' : String(cell);
-          return `<td>${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`;
-        })
-        .join('');
-      return `<tr>${cells}</tr>`;
+      const description = escapeHtml(row?.description ?? '');
+      const qty = formatQuantity(row?.qty);
+      const cost = row?.cost === null || row?.cost === undefined ? '' : formatCurrency(row.cost);
+      const sell =
+        row?.sellPrice === null || row?.sellPrice === undefined
+          ? ''
+          : formatCurrency(row.sellPrice);
+      const margin = formatGridMargin(row?.margin);
+      return `<tr>
+        <td>${description}</td>
+        <td class="numeric">${qty}</td>
+        <td class="numeric">${cost}</td>
+        <td class="numeric">${sell}</td>
+        <td class="numeric">${margin}</td>
+      </tr>`;
     })
     .join('');
-  excelEls.body.innerHTML = rows;
+  costGridEls.tableBody.innerHTML = markup;
 }
 
-async function refreshExcelSummary() {
-  if (!excelEls.body) return;
-  setExcelStatus('Loading Summary…', 'info');
-  try {
-    const response = await fetch('/api/cost-sheet/summary');
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.detail || `HTTP ${response.status}`);
+function updateCostGridMeta(meta) {
+  costGridState.lastMeta = meta || null;
+  if (costGridEls.metaPath) {
+    const pathText = meta?.path ? `Path: ${meta.path}` : '';
+    costGridEls.metaPath.textContent = pathText;
+  }
+  if (costGridEls.metaUpdated) {
+    let updatedText = '';
+    if (meta?.lastReadAt) {
+      const ts = new Date(meta.lastReadAt);
+      if (!Number.isNaN(ts.getTime())) {
+        updatedText = `Last read: ${ts.toLocaleString()}`;
+      }
     }
-    renderExcelTable(payload.values || []);
-    const rows = Array.isArray(payload.values) ? payload.values.length : 0;
-    const sheet = payload.sheet || 'Summary';
-    const range = payload.range || 'C4:K55';
-    setExcelStatus(`Loaded ${rows} row${rows === 1 ? '' : 's'} from ${sheet}!${range}.`, 'success');
-  } catch (error) {
-    const message = error && error.message ? error.message : 'Failed to load Summary range.';
-    setExcelStatus(message, 'error');
-    clearExcelTable();
+    costGridEls.metaUpdated.textContent = updatedText;
   }
 }
 
-async function openExcelWorkbook(event) {
+function handleMissingCostGridPath() {
+  showCostGridBanner(true);
+  setCostGridControlsEnabled(false);
+  updateCostGridMeta({});
+  clearCostGridTable();
+}
+
+async function fetchCostGridSummary({ quiet = false } = {}) {
+  if (!costGridEls.tableBody) return;
+  if (!quiet) {
+    setCostGridStatus('Loading Summary…', 'info');
+  }
+  try {
+    const response = await fetch('/api/panel3/summary');
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 400 && payload?.error === 'COST_SHEET_PATH_MISSING') {
+      handleMissingCostGridPath();
+      if (!quiet) {
+        setCostGridStatus('Set the cost sheet path to load the Summary grid.', 'info');
+      }
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(payload?.detail || `HTTP ${response.status}`);
+    }
+
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    renderCostGridTable(rows);
+    updateCostGridMeta(payload.meta || {});
+    showCostGridBanner(false);
+    setCostGridControlsEnabled(true);
+    const count = rows.length;
+    setCostGridStatus(`Loaded ${count} row${count === 1 ? '' : 's'} from Summary.`, 'success');
+  } catch (error) {
+    const message = error && error.message ? error.message : 'Failed to load Summary grid.';
+    setCostGridStatus(message, 'error');
+  }
+}
+
+async function submitCostGridPath(event) {
   if (event && typeof event.preventDefault === 'function') {
     event.preventDefault();
   }
-  if (!excelEls.path) {
+  if (!costGridEls.pathInput) {
     return;
   }
-  const path = excelEls.path.value ? excelEls.path.value.trim() : '';
-  if (!path) {
-    setExcelStatus('Enter the full path to Costing.xlsb.', 'error');
+  const value = costGridEls.pathInput.value ? costGridEls.pathInput.value.trim() : '';
+  if (!value) {
+    setCostGridStatus('Enter the full workbook path.', 'error');
+    costGridEls.pathInput.focus();
     return;
   }
-  setExcelStatus('Opening workbook…', 'info');
+
+  const submitButton = costGridEls.pathForm?.querySelector('button[type="submit"]');
+  if (submitButton) {
+    submitButton.disabled = true;
+  }
+  setCostGridStatus('Saving cost sheet path…', 'info');
   try {
-    const response = await fetch('/api/cost-sheet/path', {
+    const response = await fetch('/api/panel3/path', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
+      body: JSON.stringify({ path: value }),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload.detail || `HTTP ${response.status}`);
+      throw new Error(payload?.detail || `HTTP ${response.status}`);
     }
-    setExcelStatus('Workbook opened. Loading grid…', 'success');
-    await refreshExcelSummary();
+    await fetchCostGridSummary();
   } catch (error) {
-    const message = error && error.message ? error.message : 'Failed to open workbook.';
-    setExcelStatus(message, 'error');
+    const message = error && error.message ? error.message : 'Failed to save cost sheet path.';
+    setCostGridStatus(message, 'error');
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
   }
 }
 
-function initExcelPanel() {
-  if (!excelEls.body) {
+async function submitCostGridMargin(event) {
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
+  if (!costGridEls.marginInput || !costGridEls.marginButton) {
     return;
   }
-  if (excelEls.form) {
-    excelEls.form.addEventListener('submit', openExcelWorkbook);
+
+  const marginText = costGridEls.marginInput.value ? costGridEls.marginInput.value.trim() : '';
+  if (!marginText) {
+    setCostGridStatus('Enter a margin value to apply.', 'error');
+    costGridEls.marginInput.focus();
+    return;
   }
-  if (excelEls.refresh) {
-    excelEls.refresh.addEventListener('click', (event) => {
-      if (event && typeof event.preventDefault === 'function') {
-        event.preventDefault();
-      }
-      refreshExcelSummary();
+
+  let keepDisabled = false;
+  const button = costGridEls.marginButton;
+  const input = costGridEls.marginInput;
+  button.disabled = true;
+  input.disabled = true;
+  button.textContent = 'Applying…';
+  setCostGridStatus('Applying margin…', 'info');
+
+  try {
+    const response = await fetch('/api/panel3/margin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ marginText }),
     });
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 400 && payload?.error === 'COST_SHEET_PATH_MISSING') {
+      keepDisabled = true;
+      handleMissingCostGridPath();
+      setCostGridStatus('Set the cost sheet path before applying a margin.', 'error');
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(payload?.detail || `HTTP ${response.status}`);
+    }
+
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    renderCostGridTable(rows);
+    updateCostGridMeta(payload.meta || {});
+    showCostGridBanner(false);
+    setCostGridControlsEnabled(true);
+    setCostGridStatus('Margin applied.', 'success');
+  } catch (error) {
+    const message = error && error.message ? error.message : 'Failed to apply margin.';
+    setCostGridStatus(message, 'error');
+  } finally {
+    button.textContent = costGridState.marginButtonLabel;
+    setCostGridControlsEnabled(!keepDisabled);
+    if (!keepDisabled) {
+      input.focus();
+    }
   }
-  clearExcelTable();
-  refreshExcelSummary();
+}
+
+function initCostGridPanel() {
+  if (!costGridEls.tableBody) {
+    return;
+  }
+  clearCostGridTable();
+  setCostGridControlsEnabled(false);
+  if (costGridEls.pathForm) {
+    costGridEls.pathForm.addEventListener('submit', submitCostGridPath);
+  }
+  if (costGridEls.marginForm) {
+    costGridEls.marginForm.addEventListener('submit', submitCostGridMargin);
+  }
+  document.addEventListener('cost-grid:refresh', () => {
+    fetchCostGridSummary();
+  });
+  fetchCostGridSummary();
 }
 
 async function init() {
@@ -561,5 +730,5 @@ if (resetButton) {
   resetButton.addEventListener('click', resetToDefaults);
 }
 
-initExcelPanel();
+initCostGridPanel();
 init();
