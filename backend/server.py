@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from .app.cost_sheet_service import cost_sheet_service
 from .app.config import get_cost_settings
 from .routers import router as api_router
+from .services import cost_grid
 
 
 @asynccontextmanager
@@ -23,6 +24,10 @@ async def lifespan(app: FastAPI):
     try:
         from .app.excel_xlwings import excel_manager
         excel_manager.close()
+    except Exception:
+        pass
+    try:
+        cost_grid.close_excel_and_save_if_dirty()
     except Exception:
         pass
 
