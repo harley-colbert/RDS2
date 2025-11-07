@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.responses import Response
 
 from .app.cost_sheet_service import cost_sheet_service
 from .app.config import get_cost_settings
@@ -35,6 +36,13 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="RDS Generator", version="1.0.0", lifespan=lifespan)
     app.include_router(api_router)
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> Response:
+        """Return an empty response so browsers stop logging 404 errors."""
+
+        return Response(status_code=204)
+
     return app
 
 
