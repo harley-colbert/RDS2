@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RDS Local Sales Tool</title>
+    <link rel="stylesheet" href="/static/css/ui.css" />
+    <script defer src="/static/js/app.js"></script>
+  </head>
+  <body>
+    <main class="app-shell" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+      <section class="screen screen--options" aria-labelledby="system-options-title">
+        <header class="screen__header">
+          <h1 id="system-options-title">System Options</h1>
+          <p>Select workbook-aligned system options to drive pricing.</p>
+        </header>
+
+        <figure class="orientation-preview" aria-labelledby="orientation-label">
+          <div
+            id="orientation-visual"
+            class="orientation-visual orientation-visual--centered"
+            role="img"
+            aria-label="Centered orientation illustration"
+          ></div>
+          <figcaption id="orientation-label">Centered orientation</figcaption>
+        </figure>
+
+        <form id="system-options-form" class="options-form" novalidate></form>
+
+        <div class="form-actions">
+          <button id="reset-defaults" type="button">Reset to defaults</button>
+        </div>
+      </section>
+
+      <section class="screen screen--pricing" aria-labelledby="pricing-summary-title">
+        <header class="screen__header">
+          <h2 id="pricing-summary-title">Pricing Summary</h2>
+          <p>Values mirror Sheet1 cells C4:C6 and B12:B15.</p>
+        </header>
+
+        <table class="price-per-qty" aria-label="Price per quantity" role="grid">
+          <thead>
+            <tr>
+              <th scope="col">Line Item</th>
+              <th scope="col">Price Per Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Spare Parts Package</th>
+              <td id="price-per-qty-parts" class="numeric">$0.00</td>
+            </tr>
+            <tr>
+              <th scope="row">Spare Saw Blades</th>
+              <td id="price-per-qty-blades" class="numeric">$0.00</td>
+            </tr>
+            <tr>
+              <th scope="row">Spare Foam Pads</th>
+              <td id="price-per-qty-pads" class="numeric">$0.00</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <section class="totals-card" aria-label="Quote totals">
+          <div class="totals-row">
+            <span>Margin</span>
+            <strong id="summary-margin">24.00%</strong>
+          </div>
+          <div class="totals-row">
+            <span>Base Price</span>
+            <strong id="summary-base">$0.00</strong>
+          </div>
+          <div class="totals-row">
+            <span>Options Price</span>
+            <strong id="summary-options">$0.00</strong>
+          </div>
+          <div class="totals-row totals-row--total">
+            <span>Total</span>
+            <strong id="summary-grand">$0.00</strong>
+          </div>
+        </section>
+
+        <section class="options-breakdown" aria-labelledby="options-breakdown-title">
+          <header class="options-breakdown__header">
+            <h3 id="options-breakdown-title">Options Breakdown</h3>
+            <p>Reflects Sheet3 unit × qty drivers.</p>
+          </header>
+          <table role="grid">
+            <thead>
+              <tr>
+                <th scope="col">Description</th>
+                <th scope="col">Qty</th>
+                <th scope="col">Unit</th>
+                <th scope="col">Extended</th>
+              </tr>
+            </thead>
+            <tbody id="options-breakdown-body">
+              <tr class="placeholder">
+                <td colspan="4">No optional adders selected.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </section>
+
+      <!-- NEW: Third panel – live Excel Summary (C4:K55) -->
+      <section class="screen screen--excel" aria-labelledby="excel-summary-title">
+        <header class="screen__header">
+          <h2 id="excel-summary-title">Excel Summary (C4:K55)</h2>
+          <p>Live read from the Summary sheet. Set workbook path then refresh.</p>
+        </header>
+
+        <form id="excel-open-form" class="excel-open-form" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <input id="excel-path" type="text" placeholder="C:\\path\\to\\Costing.xlsb" style="flex:1;padding:6px;" />
+          <button type="submit">Open</button>
+          <button type="button" id="excel-refresh">Refresh</button>
+        </form>
+
+        <div id="excel-error" class="error" aria-live="polite" style="color:#b00020;margin-bottom:8px;"></div>
+
+        <div class="excel-grid-wrap" style="overflow:auto;max-height:calc(100vh - 280px);border:1px solid #ddd;border-radius:6px;">
+          <table id="excel-summary-table" class="excel-table" aria-label="Excel Summary range" role="grid" style="border-collapse:collapse;width:100%;font-size:12px;">
+            <tbody id="excel-summary-body">
+              <tr class="placeholder"><td style="padding:8px;color:#666;">No data loaded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>
+
+    <script>
+      // --- Third panel wiring (safe to run even if backend not ready) ---
+      (function() {
+        const form = document.getElementById('excel-open-form');
+        const pathInput = document.getElementById('excel-path');
+        const refreshBtn = document.getElementById('excel-refresh');
+        const err = document.getElementById('excel-error');
+        const tbody = document.getElementById('excel-summary-body');
+
+        function setError(msg) {
+          if (err) err.textContent = msg || '';
+        }
+
+        function clearTable() {
+          if (!tbody) return;
+          tbody.innerHTML = '<tr class="placeholder"><td style="padding:8px;color:#666;">No data loaded.</td></tr>';
+        }
+
+        function render(values) {
+          if (!tbody) return;
+          if (!Array.isArray(values) || !values.length) {
+            clearTable();
+            return;
+          }
+          const rows = values.map(row => {
+            const tds = (Array.isArray(row) ? row : [row]).map(cell => {
+              const text = (cell === null || cell === undefined) ? '' : String(cell);
+              return '<td style="border:1px solid #ddd;padding:4px;vertical-align:top;">' + text + '</td>';
+            }).join('');
+            return '<tr>' + tds + '</tr>';
+          }).join('');
+          tbody.innerHTML = rows;
+        }
+
+        async function openWorkbook(e) {
+          e && e.preventDefault();
+          setError('');
+          try {
+            const path = (pathInput && pathInput.value) || '';
+            if (!path) {
+              setError('Please enter the full path to Costing.xlsb');
+              return;
+            }
+            const res = await fetch('/api/cost-sheet/path', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ path })
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.detail || ('HTTP ' + res.status));
+            // After opening, refresh the data
+            await refresh();
+          } catch (e) {
+            setError(e && e.message ? e.message : 'Failed to open workbook.');
+          }
+        }
+
+        async function refresh() {
+          setError('');
+          try {
+            const res = await fetch('/api/cost-sheet/summary');
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.detail || ('HTTP ' + res.status));
+            render(body.values || []);
+          } catch (e) {
+            setError(e && e.message ? e.message : 'Failed to load summary.');
+            clearTable();
+          }
+        }
+
+        if (form) form.addEventListener('submit', openWorkbook);
+        if (refreshBtn) refreshBtn.addEventListener('click', refresh);
+
+        // Try an initial fetch so the panel displays if backend already configured
+        document.addEventListener('DOMContentLoaded', refresh);
+      })();
+    </script>
+  </body>
+</html>

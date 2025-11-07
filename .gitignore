@@ -10,5 +10,7 @@ __pycache__/
 *.xlsx
 *.docx
 *.pdf
+.*
+venv/*
 output/*
 !output/.gitkeep

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RDS Local Sales Tool</title>
+    <link rel="stylesheet" href="/static/css/ui.css" />
+    <script defer src="/static/js/app.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="screen screen--options" aria-labelledby="system-options-title">
+        <header class="screen__header">
+          <h1 id="system-options-title">System Options</h1>
+          <p>Select workbook-aligned system options to drive pricing.</p>
+        </header>
+
+        <figure class="orientation-preview" aria-labelledby="orientation-label">
+          <div
+            id="orientation-visual"
+            class="orientation-visual orientation-visual--centered"
+            role="img"
+            aria-label="Centered orientation illustration"
+          ></div>
+          <figcaption id="orientation-label">Centered orientation</figcaption>
+        </figure>
+
+        <form id="system-options-form" class="options-form" novalidate></form>
+
+        <div class="form-actions">
+          <button id="reset-defaults" type="button">Reset to defaults</button>
+        </div>
+      </section>
+
+      <section class="screen screen--pricing" aria-labelledby="pricing-summary-title">
+        <header class="screen__header">
+          <h2 id="pricing-summary-title">Pricing Summary</h2>
+          <p>Values mirror Sheet1 cells C4:C6 and B12:B15.</p>
+        </header>
+
+        <table class="price-per-qty" aria-label="Price per quantity" role="grid">
+          <thead>
+            <tr>
+              <th scope="col">Line Item</th>
+              <th scope="col">Price Per Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Spare Parts Package</th>
+              <td id="price-per-qty-parts" class="numeric">$0.00</td>
+            </tr>
+            <tr>
+              <th scope="row">Spare Saw Blades</th>
+              <td id="price-per-qty-blades" class="numeric">$0.00</td>
+            </tr>
+            <tr>
+              <th scope="row">Spare Foam Pads</th>
+              <td id="price-per-qty-pads" class="numeric">$0.00</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <section class="totals-card" aria-label="Quote totals">
+          <div class="totals-row">
+            <span>Margin</span>
+            <strong id="summary-margin">24.00%</strong>
+          </div>
+          <div class="totals-row">
+            <span>Base Price</span>
+            <strong id="summary-base">$0.00</strong>
+          </div>
+          <div class="totals-row">
+            <span>Options Price</span>
+            <strong id="summary-options">$0.00</strong>
+          </div>
+          <div class="totals-row totals-row--total">
+            <span>Total</span>
+            <strong id="summary-grand">$0.00</strong>
+          </div>
+        </section>
+
+        <section class="options-breakdown" aria-labelledby="options-breakdown-title">
+          <header class="options-breakdown__header">
+            <h3 id="options-breakdown-title">Options Breakdown</h3>
+            <p>Reflects Sheet3 unit × qty drivers.</p>
+          </header>
+          <table role="grid">
+            <thead>
+              <tr>
+                <th scope="col">Description</th>
+                <th scope="col">Qty</th>
+                <th scope="col">Unit</th>
+                <th scope="col">Extended</th>
+              </tr>
+            </thead>
+            <tbody id="options-breakdown-body">
+              <tr class="placeholder">
+                <td colspan="4">No optional adders selected.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </section>
+    </main>
+
+    <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>
+  </body>
+</html>
