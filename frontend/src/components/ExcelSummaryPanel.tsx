@@ -54,7 +54,7 @@ export default function ExcelSummaryPanel() {
             </label>
           </div>
         </div>
-        <CostSheetPathSelector />
+        <CostSheetPathSelector onPathSaved={fetchData} />
       </div>
       <div className="p-3 flex-1 overflow-auto">
         {loading && <div className="text-sm">Loading…</div>}
